@@ -16,6 +16,16 @@ export function isArrayUnique(arr: []): boolean {
 	return set.size === arr.length;
 }
 
+export function isCommonValue<T>(arr1: T, arr2: T): boolean {
+	if (Array.isArray(arr1) && Array.isArray(arr2)) {
+		const arrSet = new Set([...arr1, ...arr2]);
+		return !(arrSet.size === arr1.length + arr2.length);
+	} else {
+		throw new Error(`Both parameters needs to be type array.`);
+	}
+
+}
+
 export function isObjectConsistent(arr: []): boolean {
 	{
 		return arr.length > 0 ? true : false;
