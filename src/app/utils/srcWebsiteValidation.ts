@@ -1,4 +1,3 @@
-"use strict";
 import path from "path";
 import { site } from "@/site";
 import * as vldt from "./validator";
@@ -6,8 +5,8 @@ import * as vldt from "./validator";
 export function validateSrcWebsite(site: site): void {
 
 	/** validations */
-	if (vldt.areKeysValuesValid(site, ["name", "rootUrl", "entryUrl", "language", "saveDir", "siteType"])) {
-		throw new Error(`Missing or invalid key parameters ${{ name: site.name, rootUrl: site.rootUrl, entryUrl: site.entryUrl, language: site.language, saveDir: site.saveDir, siteType: site.siteType }} `);
+	if (!site.name || !site.rootUrl || !site.entryUrl || !site.language || !site.saveDir || !site.siteType || !site.nextPageType || site.tagFiltering || site.tagCollect) {
+		throw new Error(`Missing or invalid key parameters ${site}} `);
 	}
 	if (!["JP", "EN"].includes(site.language)) {
 		throw new Error(`Language needs to be either 'JP' or 'EN'.`);
@@ -32,20 +31,20 @@ export function validateSrcWebsite(site: site): void {
 	}
 	if (site.tagFiltering) {
 		if (!vldt.iskeyValueValid(site, "tags") || site.tags?.length === 0) {
-			throw new Error(`Filtering tags missing.`);
+			throw new Error("Filtering tags missing.");
 		}
 		if (site.siteType === 'links' && !vldt.iskeyValueValid(site, 'indexTagSelector')) {
-			throw new Error(`indexTagSelector missing.`);
+			throw new Error("indexTagSelector missing.");
 		}
 		if (site.siteType !== 'links' && !vldt.iskeyValueValid(site, 'articleTagSelector')) {
-			throw new Error(`articleTagSelector missing.`);
+			throw new Error("articleTagSelector missing.");
 		}
 	}
 	if (site.nextPageType === 'parameter' && !vldt.iskeyValueValid(site, 'nextPageParameter')) {
-		throw new Error(`nextPageParameter missing.`);
+		throw new Error("nextPageParameter missing.");
 	}
 	if (site.nextPageType !== 'parameter' && !vldt.iskeyValueValid(site, 'nextPageLinkSelector')) {
-		throw new Error(`nextPageLinkSelector missing.`);
+		throw new Error("nextPageLinkSelector missing.");
 	}
 
 	if (site.siteType === 'links' && !vldt.areKeysValuesValid(site, ["indexlinkBlockSelector", "indexlinkSelector"])) {
@@ -53,7 +52,7 @@ export function validateSrcWebsite(site: site): void {
 	}
 
 	if (!vldt.areKeysValuesValid(site, ["articleTitleSelector", "articleBodySelector"])) {
-		throw new Error(`Missing article selector.`);
+		throw new Error("Missing article selector.");
 	}
 
 }

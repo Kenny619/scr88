@@ -32,17 +32,17 @@ export function isObjectConsistent(arr: []): boolean {
 
 }
 
-export function areKeysValuesValid(obj: Record<string, string>, arr: string[]): boolean {
+export function areKeysValuesValid(obj: object, arr: string[]): boolean {
 
 	if (typeof obj !== 'object') return false;
 	for (const key of arr) {
-		if (!Object.hasOwn(obj, key) || !obj[key]) return false;
+		if (!Object.hasOwn(obj, key) || !obj[key as keyof typeof obj]) return false;
 	}
 	return true;
 }
 
-export function iskeyValueValid(obj: Record<string, string>, key: string) {
-	return typeof obj === 'object' && Object.hasOwn(obj, key) && !!obj[key];
+export function iskeyValueValid(obj: object, key: string): boolean {
+	return typeof obj === 'object' && Object.hasOwn(obj, key) && !!obj[key as keyof typeof obj];
 }
 
 export function isWritable(directoryPath: string): boolean {
