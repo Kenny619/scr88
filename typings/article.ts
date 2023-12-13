@@ -4,5 +4,11 @@ export interface articles {
 	url: string,
 	title?: string,
 	body: string,
-	tags?: string[]
+	tags?: (string | null)[]
+}
+
+export interface exportedArticles {
+	name: string,
+	id: string,
+	url: string,
 }

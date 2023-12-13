@@ -6,8 +6,8 @@ export function isURL(url: string): boolean {
 }
 
 export function isAllTruthy(arr: []): boolean {
-	for (let entry of arr) {
-		if (!!entry) return false;
+	for (const entry of arr) {
+		if (!entry) return false;
 	}
 	return true;
 }
@@ -20,9 +20,8 @@ export function isCommonValue<T>(arr1: T, arr2: T): boolean {
 	if (Array.isArray(arr1) && Array.isArray(arr2)) {
 		const arrSet = new Set([...arr1, ...arr2]);
 		return !(arrSet.size === arr1.length + arr2.length);
-	} else {
-		throw new Error(`Both parameters needs to be type array.`);
 	}
+	throw new Error("Both parameters needs to be type array.");
 
 }
 
@@ -33,17 +32,17 @@ export function isObjectConsistent(arr: []): boolean {
 
 }
 
-export function areKeysValuesValid(obj: Record<string, any>, arr: string[]): boolean {
+export function areKeysValuesValid(obj: Record<string, string>, arr: string[]): boolean {
 
 	if (typeof obj !== 'object') return false;
-	for (let key of arr) {
-		if (!obj.hasOwnProperty(key) || !obj[key]) return false;
+	for (const key of arr) {
+		if (!Object.hasOwn(obj, key) || !obj[key]) return false;
 	}
 	return true;
 }
 
-export function iskeyValueValid(obj: Record<string, any>, key: string) {
-	return typeof obj === 'object' && obj.hasOwnProperty(key) && !!obj[key];
+export function iskeyValueValid(obj: Record<string, string>, key: string) {
+	return typeof obj === 'object' && Object.hasOwn(obj, key) && !!obj[key];
 }
 
 export function isWritable(directoryPath: string): boolean {
