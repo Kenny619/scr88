@@ -97,22 +97,21 @@ export class Scr88 {
 		}
 	}
 
-	getTags(doc: (Element | Document), selector: string): (string | null)[] {
+	getTags(doc: (Element | Document), selector: string): string[] | false {
 		const elements = doc.querySelectorAll(selector);
-		return elements.length === 0 ? [] : Array.from(elements).map(el => el.textContent);
+		if (elements.length === 0) return false;
+		const tags = [];
+		for (const el of elements) {
+			if (el.textContent) tags.push(el.textContent);
+		}
+		return tags;
 	}
 
-	checkArticleTag(doc: Element, selector: string) {
+	checkArticleTag(doc: Element, selector: string): boolean {
 		const tags = this.getTags(doc, selector);
-		if (this.site.tags) {
-			for (const tag of tags) {
-				if (tag && this.site.tags.includes(tag)) {
-					return true;
-				}
-			}
-		}
+		if (!tags || !this.site.tags) return false;
+		return vldt.isCommonValue<string[]>(this.site.tags, tags);
 
-		return false;
 	}
 
 	async getDom(): Promise<Document> {
@@ -212,7 +211,8 @@ export class Scr88 {
 		};
 
 		if (this.site.tagCollect && this.site.articleTagSelector) {
-			article.tags = this.getTags(dom, this.site.articleTagSelector);
+			const _tags = this.getTags(dom, this.site.articleTagSelector);
+			if (_tags) article.tags = _tags;
 		}
 
 		return article;
