@@ -1,32 +1,40 @@
 {
-  "name": "scr88",
-  "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "test"
-  },
-  "type": "module",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rom61977/scr88.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/rom61977/scr88/issues"
-  },
-  "homepage": "https://github.com/rom61977/scr88#readme",
-  "dependencies": {
-    "dotenv": "^16.3.1",
-    "fs": "^0.0.1-security",
-    "jsdom": "^23.0.1",
-    "puppeteer": "^21.4.1",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.4.1",
-    "@types/jsdom": "^21.1.6"
-  }
+	"name": "scr88",
+	"version": "0.0.1",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"test": "vitest",
+		"prebuild": "rimraf dist",
+		"build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json"
+	},
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/rom61977/scr88.git"
+	},
+	"author": "",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/rom61977/scr88/issues"
+	},
+	"homepage": "https://github.com/rom61977/scr88#readme",
+	"dependencies": {
+		"dotenv": "^16.3.1",
+		"fs": "^0.0.1-security",
+		"jsdom": "^23.0.1",
+		"puppeteer": "^21.4.1",
+		"puppeteer-extra": "^3.3.6",
+		"puppeteer-extra-plugin-stealth": "^2.11.2",
+		"top-user-agents": "^1.0.66",
+		"vite-tsconfig-paths": "^4.2.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.4.1",
+		"@types/jsdom": "^21.1.6",
+		"@vitejs/plugin-react": "^4.2.1",
+		"happy-dom": "^12.10.3",
+		"vite": "^5.0.9",
+		"vitest": "^1.0.4"
+	}
 }

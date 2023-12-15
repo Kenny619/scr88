@@ -1,28 +1,28 @@
 export interface site {
-	name: string,
-	rootUrl: string,
-	entryUrl: string,
-	language: "JP" | "EN",
-	saveDir: string,
-	siteType: "links" | "multipleArticle" | "singleArticle",
+	name: string;
+	rootUrl: string;
+	entryUrl: string;
+	language: "JP" | "EN";
+	saveDir: string;
+	siteType: "links" | "multipleArticle" | "singleArticle";
 
-	nextPageType: "parameter" | "pagenation" | "next",
-	nextPageParameter?: string,
-	nextPageLinkSelector?: string,
-	startingPageNumber?: number,
+	nextPageType: "parameter" | "pagenation" | "next";
+	nextPageParameter?: string;
+	nextPageLinkSelector?: string;
+	startingPageNumber?: number;
 
-	tagFiltering: "index" | "article" | false,
-	tags?: string[],
-	tagCollect: boolean,
-	indexTagSelector?: string,
-	articleTagSelector?: string,
+	tagFiltering: "index" | "article" | boolean;
+	tags?: string[];
+	tagCollect: boolean;
+	indexTagSelector?: string;
+	articleTagSelector?: string;
 
-	indexLinkBlockSelector?: string,
-	indexLinkSelector?: string,
+	indexLinkBlockSelector?: string;
+	indexLinkSelector?: string;
 
-	articleTitleSelector: string,
-	articleBodySelector: string,
-
+	articleBlockSelector?: string;
+	articleTitleSelector: string;
+	articleBodySelector: string;
 }
 // export interface basesite {
 // 	name: string,
@@ -62,4 +62,3 @@ export interface site {
 // export interface linkSelector extends basesite {
 // 	nextPageLinkSelector: string,
 // }
-

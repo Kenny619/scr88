@@ -1,61 +1,76 @@
 import path from "path";
-import { site } from "@/site";
-import * as vldt from "./validator";
+import { site } from "../../typings/index.js";
+import * as vldt from "./validator.js";
 
-export function validateSrcWebsite(site: site): void {
-
+export default function validateSrcWebsite(site: site): boolean {
 	/** validations */
-	if (!site.name || !site.rootUrl || !site.entryUrl || !site.language || !site.saveDir || !site.siteType || !site.nextPageType || site.tagFiltering || site.tagCollect) {
-		throw new Error(`Missing or invalid key parameters ${site}} `);
+	if ([site.name, site.rootUrl, site.entryUrl, site.saveDir, site.siteType, site.nextPageType, site.tagFiltering, site.tagCollect].some((prop) => !prop)) {
+		console.error(`Missing or invalid key parameters ${site}} `);
+		return false;
 	}
 	if (!["JP", "EN"].includes(site.language)) {
-		throw new Error(`Language needs to be either 'JP' or 'EN'.`);
+		console.error(`Language needs to be either 'JP' or 'EN'.`);
+		return false;
 	}
 	if (!/(EN|JP)$/.test(site.saveDir)) {
 		site.saveDir = path.join(site.saveDir, site.language);
 	}
 	if (!vldt.isWritable(site.saveDir)) {
-		throw new Error(`Export directory: ${site.saveDir} doesn't exist or does not have a write permission.`);
+		console.error(`Export directory: ${site.saveDir} doesn't exist or does not have a write permission.`);
+		return false;
 	}
 	if (!vldt.isURL(site.rootUrl)) {
-		throw new Error(`${site.rootUrl} is not a valid URL.`);
+		console.error(`${site.rootUrl} is not a valid URL.`);
+		return false;
 	}
 	if (!vldt.isURL(site.entryUrl)) {
-		throw new Error(`${site.entryUrl} is not a valid URL.`);
+		console.error(`${site.entryUrl} is not a valid URL.`);
+		return false;
 	}
 	if (!["links", "multipleArticles", "singleArticle"].includes(site.siteType)) {
-		throw new Error(`siteType value must be either "links", "multipleArticle", or "singleArticle".`);
+		console.error(`siteType value must be either "links", "multipleArticle", or "singleArticle".`);
+		return false;
 	}
 	if (!["parameter", "pagenation", "next"].includes(site.nextPageType)) {
-		throw new Error(`nextPageType value must be either "parameter","pagenation", or"next".`);
+		console.error(`nextPageType value must be either "parameter","pagenation", or"next".`);
+		return false;
 	}
 	if (site.tagFiltering) {
 		if (!vldt.iskeyValueValid(site, "tags") || site.tags?.length === 0) {
-			throw new Error("Filtering tags missing.");
+			console.error("Filtering tags missing.");
+			return false;
 		}
-		if (site.siteType === 'links' && !vldt.iskeyValueValid(site, 'indexTagSelector')) {
-			throw new Error("indexTagSelector missing.");
+		if (site.siteType === "links" && !vldt.iskeyValueValid(site, "indexTagSelector")) {
+			console.error("indexTagSelector missing.");
+			return false;
 		}
-		if (site.siteType !== 'links' && !vldt.iskeyValueValid(site, 'articleTagSelector')) {
-			throw new Error("articleTagSelector missing.");
+		if (site.siteType !== "links" && !vldt.iskeyValueValid(site, "articleTagSelector")) {
+			console.error("articleTagSelector missing.");
+			return false;
 		}
 	}
-	if (site.nextPageType === 'parameter' && !vldt.iskeyValueValid(site, 'nextPageParameter')) {
-		throw new Error("nextPageParameter missing.");
+	if (site.nextPageType === "parameter" && !vldt.iskeyValueValid(site, "nextPageParameter")) {
+		console.error("nextPageParameter missing.");
+		return false;
 	}
-	if (site.nextPageType !== 'parameter' && !vldt.iskeyValueValid(site, 'nextPageLinkSelector')) {
-		throw new Error("nextPageLinkSelector missing.");
+	if (site.nextPageType !== "parameter" && !vldt.iskeyValueValid(site, "nextPageLinkSelector")) {
+		console.error("nextPageLinkSelector missing.");
+		return false;
 	}
 
-	if (site.siteType === 'links' && !vldt.areKeysValuesValid(site, ["indexlinkBlockSelector", "indexlinkSelector"])) {
-		throw new Error(`indexlinkBlockSelector" and "indexlinkSelector" are required when siteType is set to 'links. `);
+	if (site.siteType === "links" && !vldt.areKeysValuesValid(site, ["indexlinkBlockSelector", "indexlinkSelector"])) {
+		console.error(`indexlinkBlockSelector" and "indexlinkSelector" are required when siteType is set to 'links. `);
+		return false;
 	}
 
 	if (!vldt.areKeysValuesValid(site, ["articleTitleSelector", "articleBodySelector"])) {
-		throw new Error("Missing article selector.");
+		console.error("Missing article selector.");
+		return false;
 	}
 
+	if (site.siteType === "multipleArticle" && !vldt.iskeyValueValid(site, "articleBlockSelector")) {
+		console.error("articleBlockSelector missing.");
+		return false;
+	}
+	return true; // if all validations pass, return true. Otherwise, return false. 👍🏻👍🏻👍🏻👍🏻👍🏻👍�
 }
-
-
-
