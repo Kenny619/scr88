@@ -1,2 +1,2 @@
-export * from './site';
-export * from './article';
+export * from "./site.js";
+export * from "./article.js";

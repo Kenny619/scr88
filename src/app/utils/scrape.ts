@@ -1,18 +1,16 @@
-import fs, { readFileSync, readdirSync } from "fs";
+import fs from "fs";
 import path from "path";
 import { JSDOM, ResourceLoader } from "jsdom";
 
 //types
-import { articles, exportedArticles, site } from "type/index";
+import { articles, exportedArticles, site } from "../../typings/index.js";
 
-import { validateSrcWebsite } from "./srcWebsiteValidation";
+import validateSrcWebsite from "./srcWebsiteValidation.js";
+import userAgent from "./userAgents.js";
 //local utilities
-import * as vldt from "./validator";
+import * as vldt from "./validator.js";
 
-//UserAgent list path
-const UApath = "./files/ua.txt";
-
-export class Scr88 {
+export default class Scraper {
 	site: site;
 	exportedArticles: exportedArticles[];
 	acquiredArticles!: articles[];
@@ -73,7 +71,9 @@ export class Scr88 {
 		}
 
 		/** validation */
-		validateSrcWebsite(this.site);
+		if (!validateSrcWebsite(this.site)) {
+			throw new Error("Invalid source website.");
+		}
 
 		/** List of previously acquired contents ids */
 		this.exportedArticles = this.getExportedArticles() || [];
@@ -170,10 +170,11 @@ export class Scr88 {
 		//  throw new Error(`Directory ${srcDir} does not exist.`);
 
 		try {
-			return readdirSync(srcDir, { withFileTypes: true, encoding: "utf-8" })
+			return fs
+				.readdirSync(srcDir, { withFileTypes: true, encoding: "utf-8" })
 				.filter((dirent) => dirent.isFile() && dirent.name.endsWith(".txt"))
 				.map((dirent) => {
-					const file = readFileSync(path.join(srcDir, dirent.name), {
+					const file = fs.readFileSync(path.join(srcDir, dirent.name), {
 						encoding: "utf-8",
 					});
 					return JSON.parse(file);
@@ -210,11 +211,9 @@ export class Scr88 {
 		let dom;
 
 		/** Configure UserAgent */
-		const userAgents = readFileSync(UApath, { encoding: "utf-8" }).split("\r\n");
-		const r = Math.floor(Math.random() * userAgents.length);
 
 		const loader = new ResourceLoader({
-			userAgent: userAgents[r],
+			userAgent: await userAgent(),
 		});
 
 		try {

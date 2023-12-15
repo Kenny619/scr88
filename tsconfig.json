@@ -19,13 +19,13 @@
     "noUnusedParameters": true,
 
     //Modules https://www.typescriptlang.org/tsconfig#Modules_6244
-    "moduleResolution": "node",
-    "module": "ESNext",
+//    "moduleResolution": "node",
+    "module": "NodeNext",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/app/*"],
-      "utils/*": ["./src/app/utils/*"],
-      "type/*": ["./src/typings/*"]
+      "@utils/*": ["./src/app/utils/*"],
+      "@type/*": ["./src/typings/*"]
     },
 
     //emit https://www.typescriptlang.org/tsconfig#Emit_6246
