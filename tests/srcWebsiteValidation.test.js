@@ -1,6 +1,5 @@
 import { expect, test } from "vitest";
-import Scraper from "../dist/app/utils/scrape.js";
-
+import validateSiteInputs from "../dist/app/utils/srcWebsiteValidation";
 const enigma = {
 	name: "enigma",
 	rootUrl: "https://enigma2.ahoseek.com/",
@@ -20,22 +19,11 @@ const enigma = {
 
 	articleTitleSelector: "h1.entry-title",
 	articleBodySelector: "div#the-content",
-
-	lastUrlSelector: "ul.pagination > li.last > a",
-	lastPageNumberRegExp: "/page/(\\d+)/$",
 };
 
-const scr = new Scraper(enigma);
-//scr.scrape();
-console.log(scr.debug());
-
-test("constructor", async () => {
-	expect(scr.debug()).toBeTruthy();
+test("validateSiteInputs", async () => {
+	const errorMsg = validateSiteInputs(enigma);
+	console.log(errorMsg);
+	expect(errorMsg).toBeDefined();
+	expect(errorMsg.length).toBe(0);
 });
-
-test("getLinksFromIndex", async () => {
-	expect((await scr.getLinksFromIndex()).length).toBeGreaterThan(0);
-	console.log(await scr.getLinksFromIndex());
-});
-
-test("getUrls");

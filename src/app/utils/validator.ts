@@ -36,7 +36,9 @@ export function areKeysValuesValid(obj: object, arr: string[]): boolean {
 
 	if (typeof obj !== 'object') return false;
 	for (const key of arr) {
-		if (!Object.hasOwn(obj, key) || !obj[key as keyof typeof obj]) return false;
+		if (!Object.hasOwn(obj, key) || !obj[key as keyof typeof obj]) {
+			return false;
+		}
 	}
 	return true;
 }

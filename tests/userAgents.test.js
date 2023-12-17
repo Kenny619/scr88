@@ -1,12 +1,9 @@
 import { expect, test } from "vitest";
-import { userAgent } from "../dist/app/utils/userAgents";
+import userAgent from "../dist/app/utils/userAgents";
 
 test("random userAgent", async () => {
 	const ua1 = await userAgent();
-	let ua2 = await userAgent();
-	while (ua1 === ua2) {
-		ua2 = await userAgent();
-	}
+	const ua2 = await userAgent();
 
 	expect(ua1).toBeDefined();
 	expect(ua1).toBeTypeOf("string");

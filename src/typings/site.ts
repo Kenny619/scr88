@@ -1,64 +1,83 @@
 export interface site {
+
+	/** required ------------------------------------- */
+
+	//name of the project
 	name: string;
+
+	//FQDN of the source site
 	rootUrl: string;
+
+	//Initial URL to start scraping
 	entryUrl: string;
-	language: "JP" | "EN";
+
+	//Output dir path
 	saveDir: string;
+
+	//Language of the source site.  Output file
+	language: "JP" | "EN";
+
+	//Source site type.
 	siteType: "links" | "multipleArticle" | "singleArticle";
 
-	nextPageType: "parameter" | "pagenation" | "next";
+	//How to transition to the next page
+	nextPageType: "parameter" | "pagenation" | "next" | "url" | "last";
+
+	//If nextPageType = "last" | CSS selector for getting the last page url
+	lastUrlSelector?: string;
+
+	//If nextPageType = "last" | RegExp for getting the last page number
+	lastPageNumberRegExp?: string;
+
+
+	//If true, scrape articles that has matching tags to tags parameter
+	tagFiltering: boolean;
+
+	//Collect tags from the article
+	tagCollect: boolean;
+
+	//CSS selector for the title of the article
+	articleTitleSelector: string;
+
+	//CSS selector for the body of the article
+	articleBodySelector: string;
+
+
+	/** optional: Next Page parameters ------------- */
+
+	//if nextPageType === "parameter"
 	nextPageParameter?: string;
+
+	//if nextPageType === "next|pagenation" | CSS selector for next page link
 	nextPageLinkSelector?: string;
+
+	//if nextPageType === "url" | RegExp for picking the page number from URL
+	nextPageUrlRegExp?: string;
+
+	//if nextPageType === "pagenation" && starting page is not the top/first page.
 	startingPageNumber?: number;
 
-	tagFiltering: "index" | "article" | boolean;
+
+	/** optional: Tags ----------------------------- */
+
+	//if tagFiltering is true.  Tags used to filter the articles
 	tags?: string[];
-	tagCollect: boolean;
+
+	//if tagFiltering is true. | CSS selector for the tags on index page
 	indexTagSelector?: string;
+
+	//if tagFiltering is true OR tagCollection is true | CSS selector for the tags
 	articleTagSelector?: string;
 
+
+	/** optional: siteType parameters ----------------------------- */
+
+	//CSS selector for capturing link block on index page
 	indexLinkBlockSelector?: string;
+
+	//CSS selector for capturing link to the article page
 	indexLinkSelector?: string;
 
+	//CSS selector for capturing article block on multi-article page
 	articleBlockSelector?: string;
-	articleTitleSelector: string;
-	articleBodySelector: string;
 }
-// export interface basesite {
-// 	name: string,
-// 	rootUrl: string,
-// 	entryUrl: string,
-// 	language: "JP" | "EN",
-// 	saveDir: string,
-// 	siteType: "links" | "multipleArticle" | "singleArticle",
-// 	nextPageType: "parameter" | "pagenation" | "next",
-
-// 	tagFiltering: boolean,
-// 	tagCollect: boolean,
-
-// 	articleTitleSelector: string,
-// 	articleBodySelector: string,
-
-// };
-
-// export interface filterTag extends basesite {
-// 	tags: string[],
-// }
-
-// export interface collectTag extends basesite {
-// 	articleTagSelector: string,
-// }
-
-// export interface links extends basesite {
-// 	indexlinkBlockSelector: string
-// 	indexlinkSelector: string,
-// 	indexTagSelector: string,
-// }
-
-// export interface parameter extends basesite {
-// 	nextPageParameter: string,
-// }
-
-// export interface linkSelector extends basesite {
-// 	nextPageLinkSelector: string,
-// }

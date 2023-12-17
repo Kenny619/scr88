@@ -1,76 +1,127 @@
+import fs from 'fs';
 import path from "path";
 import { site } from "../../typings/index.js";
 import * as vldt from "./validator.js";
 
-export default function validateSrcWebsite(site: site): boolean {
-	/** validations */
-	if ([site.name, site.rootUrl, site.entryUrl, site.saveDir, site.siteType, site.nextPageType, site.tagFiltering, site.tagCollect].some((prop) => !prop)) {
-		console.error(`Missing or invalid key parameters ${site}} `);
-		return false;
+/**
+ * Validates the input site object against the site interface.
+ * @param {site} site - The site object to be validated.
+ * @returns {string[]} - An array of error messages for invalid inputs.
+ */
+export default function validateSiteInputs(site: site): string[] {
+
+	//Stores error message
+	const errorMsgs = [];
+
+	//Required properties.
+	const requiredProps = ["name", "rootUrl", "entryUrl", "saveDir",
+		"siteType", "language", "nextPageType", "tagFiltering", "tagCollect", "articleTitleSelector",
+		"articleBodySelector"];
+
+	for (const prop of requiredProps) {
+		if (!Object.hasOwn(site, prop)) errorMsgs.push(`Missing required property ${prop}`);
 	}
-	if (!["JP", "EN"].includes(site.language)) {
-		console.error(`Language needs to be either 'JP' or 'EN'.`);
-		return false;
-	}
-	if (!/(EN|JP)$/.test(site.saveDir)) {
-		site.saveDir = path.join(site.saveDir, site.language);
-	}
-	if (!vldt.isWritable(site.saveDir)) {
-		console.error(`Export directory: ${site.saveDir} doesn't exist or does not have a write permission.`);
-		return false;
-	}
-	if (!vldt.isURL(site.rootUrl)) {
-		console.error(`${site.rootUrl} is not a valid URL.`);
-		return false;
-	}
-	if (!vldt.isURL(site.entryUrl)) {
-		console.error(`${site.entryUrl} is not a valid URL.`);
-		return false;
-	}
+
+	//URL format check
+	if (!vldt.isURL(site.rootUrl)) errorMsgs.push(`${site.rootUrl} is not a valid URL.`);
+	if (!vldt.isURL(site.entryUrl)) errorMsgs.push(`${site.entryUrl} is not a valid URL.`);
+
+
+
+	//Static string value check
+	if (!["EN", "JP"].includes(site.language)) errorMsgs.push("Language needs to be either 'JP' or 'EN'.");
+
 	if (!["links", "multipleArticles", "singleArticle"].includes(site.siteType)) {
-		console.error(`siteType value must be either "links", "multipleArticle", or "singleArticle".`);
-		return false;
+		errorMsgs.push(`siteType value must be either "links", "multipleArticle", or "singleArticle".`);
 	}
-	if (!["parameter", "pagenation", "next"].includes(site.nextPageType)) {
-		console.error(`nextPageType value must be either "parameter","pagenation", or"next".`);
-		return false;
+
+	if (!["parameter", "pagenation", "next", "url", "last"].includes(site.nextPageType)) {
+		errorMsgs.push(`nextPageType value must be either "parameter","pagenation","next","url", or "last".`);
 	}
+
+	//type check
+	if (typeof site.tagFiltering !== "boolean") errorMsgs.push('tagFiltering must be type boolean.');
+	if (typeof site.tagCollect !== "boolean") errorMsgs.push('tagCollect must be type boolean.');
+
+
+	//tag filtering optional parameter check
 	if (site.tagFiltering) {
 		if (!vldt.iskeyValueValid(site, "tags") || site.tags?.length === 0) {
-			console.error("Filtering tags missing.");
-			return false;
+			errorMsgs.push("Filtering tags missing.");
 		}
+
 		if (site.siteType === "links" && !vldt.iskeyValueValid(site, "indexTagSelector")) {
-			console.error("indexTagSelector missing.");
-			return false;
+			errorMsgs.push("indexTagSelector missing.");
 		}
+
 		if (site.siteType !== "links" && !vldt.iskeyValueValid(site, "articleTagSelector")) {
-			console.error("articleTagSelector missing.");
-			return false;
+			errorMsgs.push("articleTagSelector missing.");
 		}
 	}
+
+
+	//NextPageType optional parameter check
 	if (site.nextPageType === "parameter" && !vldt.iskeyValueValid(site, "nextPageParameter")) {
-		console.error("nextPageParameter missing.");
-		return false;
-	}
-	if (site.nextPageType !== "parameter" && !vldt.iskeyValueValid(site, "nextPageLinkSelector")) {
-		console.error("nextPageLinkSelector missing.");
-		return false;
+		errorMsgs.push("nextPageParameter is required when nextPageType is set to 'parameter'.");
 	}
 
-	if (site.siteType === "links" && !vldt.areKeysValuesValid(site, ["indexlinkBlockSelector", "indexlinkSelector"])) {
-		console.error(`indexlinkBlockSelector" and "indexlinkSelector" are required when siteType is set to 'links. `);
-		return false;
+	if ((site.nextPageType === "pagenation" || site.nextPageType === "next") && !vldt.iskeyValueValid(site, "nextPageLinkSelector")) {
+		errorMsgs.push("nextPageLinkSelector  is required when nextPageType is set to 'pagenation'.");
 	}
 
-	if (!vldt.areKeysValuesValid(site, ["articleTitleSelector", "articleBodySelector"])) {
-		console.error("Missing article selector.");
-		return false;
+	if (site.nextPageType === "pagenation" && site.startingPageNumber === undefined) {
+		errorMsgs.push("startingPageNumber  is required when nextPageType is set to 'pagenation'.");
+	}
+
+	if (site.nextPageType === "url" && !vldt.iskeyValueValid(site, "nextPageUrlRegExp")) {
+		errorMsgs.push("nextPageUrlRegExp  is required when nextPageType is set to 'url'.");
+	}
+
+	if (site.nextPageType === 'last' && !vldt.iskeyValueValid(site, "lastUrlSelector")) {
+		errorMsgs.push("lastUrlSelector  is required when nextPageType is set to 'last'.");
+	}
+
+	if (site.nextPageType === 'last' && !vldt.iskeyValueValid(site, "lastPageNumberRegExp")) {
+		errorMsgs.push("lastPageNumberRegExp  is required when nextPageType is set to 'last'.");
+	}
+
+	if (site.siteType === "links" && !vldt.areKeysValuesValid(site, ["indexLinkBlockSelector", "indexLinkSelector"])) {
+		errorMsgs.push(`indexlinkBlockSelector" and "indexlinkSelector" are required when siteType is set to 'links. `);
+	}
+
+	/** siteType opetional parameter check */
+
+	//articleTitleSelector
+	if (!vldt.iskeyValueValid(site, "articleTitleSelector")) {
+		errorMsgs.push("Invalid articleTitleSelector.");
+	}
+
+	if (!vldt.iskeyValueValid(site, "articleBodySelector")) {
+		errorMsgs.push("Invalid articleBodySelector.");
 	}
 
 	if (site.siteType === "multipleArticle" && !vldt.iskeyValueValid(site, "articleBlockSelector")) {
-		console.error("articleBlockSelector missing.");
-		return false;
+		errorMsgs.push("Invalid articleBlockSelector.");
+
 	}
-	return true; // if all validations pass, return true. Otherwise, return false. 👍🏻👍🏻👍🏻👍🏻👍🏻👍�
+
+	//helper - If output directory didn't include language, add it.
+	if (!/(EN|JP)$/.test(site.saveDir)) {
+		site.saveDir = path.join(site.saveDir, site.language);
+	}
+
+	//helper - If saveDir didn't exit, create it.
+	try {
+		if (!fs.existsSync(site.saveDir)) {
+			fs.mkdirSync(site.saveDir, { recursive: true });
+		}
+	} catch (err) {
+		errorMsgs.push(`${site.saveDir} doesn't exit. Failed to create a directory. ${err}`);
+	}
+
+	//output dir write permission check
+	if (!vldt.isWritable(site.saveDir)) errorMsgs.push(`Export directory: ${site.saveDir} doesn't exist or does not have a write permission.`);
+
+
+	return errorMsgs;
 }
