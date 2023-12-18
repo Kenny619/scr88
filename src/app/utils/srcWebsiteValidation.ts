@@ -14,9 +14,19 @@ export default function validateSiteInputs(site: site): string[] {
 	const errorMsgs = [];
 
 	//Required properties.
-	const requiredProps = ["name", "rootUrl", "entryUrl", "saveDir",
-		"siteType", "language", "nextPageType", "tagFiltering", "tagCollect", "articleTitleSelector",
-		"articleBodySelector"];
+	const requiredProps = [
+		"name",
+		"rootUrl", 
+		"entryUrl", 
+		"saveDir",
+		"siteType", 
+		"language", 
+		"nextPageType", 
+		"tagFiltering", 
+		"tagCollect", 
+		"articleTitleSelector",
+		"articleBodySelector"
+	];
 
 	for (const prop of requiredProps) {
 		if (!Object.hasOwn(site, prop)) errorMsgs.push(`Missing required property ${prop}`);
@@ -122,6 +132,8 @@ export default function validateSiteInputs(site: site): string[] {
 	//output dir write permission check
 	if (!vldt.isWritable(site.saveDir)) errorMsgs.push(`Export directory: ${site.saveDir} doesn't exist or does not have a write permission.`);
 
+	//helper - If startingPageNumber is missing, then set 1
+	if (!Object.hasOwn(site, "startingPageNumber")) site.startingPageNumber = 1;
 
 	return errorMsgs;
 }

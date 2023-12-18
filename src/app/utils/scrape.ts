@@ -5,25 +5,34 @@ import { JSDOM, ResourceLoader } from "jsdom";
 //types
 import { articles, exportedArticles, site } from "../../typings/index.js";
 import _error from "./errorHandler.js";
-import { assertExists } from "./exist.js";
+import { assertExists, exists } from "./exist.js";
 //local utilities
 import validateSiteInputs from "./srcWebsiteValidation.js";
 import userAgent from "./userAgents.js";
 import * as vldt from "./validator.js";
 
 export default class Scraper {
-	site: site;
-	exportedArticles: exportedArticles[];
-	acquiredArticles!: articles[];
-	currentURL: URL;
-	nextUrl!: string | undefined;
-	currentPageNumber: number;
-	currentURLdom!: Document;
-	linkQueue: string[];
-	foundNewArticles: boolean;
-	constructor(srcWebsite: site) {
+	//source website parameters
+	protected site: site;
+	//Existing articles in site.saveDir
+	protected exportedArticles: exportedArticles[];
+	//List of newly acquired contents ids
+	protected acquiredArticles!: articles[];
+	//current page URL object
+	protected currentURL: URL;
+	//DOM of currentURL
+	protected currentUrlDOM!: Document;
+	//Current PageNumber - for nextPageType = pagenation
+	protected currentPageNumber: number;
+	//if nextUrlType = last | pages to be scraped
+	protected siteURLs: string[];
+	//warning messages
+	protected warnings: string[];
+	//Failed URLs
+	protected failedURLs: string[];
 
-		/** validation */
+	constructor(srcWebsite: site) {
+		// srcWebsite validation
 		const valResult = validateSiteInputs(srcWebsite);
 
 		if (valResult.length > 0) {
@@ -34,19 +43,23 @@ export default class Scraper {
 		this.site = srcWebsite;
 
 		// List of previously acquired contents ids
-		this.exportedArticles = this.getExportedArticles() || [];
+		this.exportedArticles = this.getExportedArticles() ?? [];
 
 		// currentURL
 		this.currentURL = new URL(this.site.entryUrl);
 
-		// Extracted source links
-		this.linkQueue = [];
+		//current page number for nextPageType = pagenation
+		assertExists<number>(this.site.startingPageNumber);
+		this.currentPageNumber = this.site.startingPageNumber;
 
-		//New article tracker.  Sets to false when there are no new article
-		this.foundNewArticles = true;
+		// list of URLs to be scraped.  Only used when nextUrlType = last
+		this.siteURLs = [];
 
-		//starting page number.  1 unless startingPageNumber is passed.
-		this.currentPageNumber = this.site.startingPageNumber || 1;
+		//warnings
+		this.warnings = [];
+
+		//failed URLs
+		this.failedURLs = [];
 	}
 
 	debug(): object {
@@ -54,6 +67,13 @@ export default class Scraper {
 	}
 
 	async scrape(): Promise<void> {
+		/** get current dom */
+		this.currentUrlDOM = await this.getDOM(this.currentURL.href);
+
+		/** get siteURLs */
+		if (this.site.nextPageType === "last") {
+			this.getPageURLs();
+		}
 
 		switch (this.site.siteType) {
 			case "links":
@@ -68,39 +88,12 @@ export default class Scraper {
 				await this.scrapeMultiples();
 				break;
 		}
-
-	}
-
-	async getPageURLs(): Promise<string[]> {
-
-		assertExists<string>(this.site.lastUrlSelector);
-		assertExists<string>(this.site.lastPageNumberRegExp);
-
-		const lastElem = this.currentURLdom.querySelector(this.site.lastUrlSelector);
-		assertExists<Element>(lastElem);
-
-		const lastUrl = lastElem.getAttribute("href");
-		assertExists<string>(lastUrl);
-
-		const lpnRegExp = new RegExp(this.site.lastPageNumberRegExp);
-
-		const lpnResult = lastUrl.match(lpnRegExp);
-		if (!lpnResult) throw new Error(`RegExp failed ${this.site.lastPageNumberRegExp}`);
-		const lastPageNumber = Number(lpnResult[1]);
-
-		const nextPage = this.currentPageNumber !== 1 ? this.currentPageNumber : 2;
-		const urls = [];
-		for (let i = nextPage; i <= lastPageNumber; i++) {
-			urls.push(lastUrl.replace(lpnRegExp, `/page/${i}/`));
-		}
-
-		return urls;
 	}
 
 	//Scrape index
 	async scrapeIndex(): Promise<void> {
 		do {
-			const articleLinks = await this.getLinksFromIndex();
+			const articleLinks = this.getLinksFromIndex();
 			this.linkQueue.push(...articleLinks);
 			if (await this.isNextPage()) {
 				this.gotoNextPage();
@@ -140,20 +133,38 @@ export default class Scraper {
 		} while (this.foundNewArticles);
 	}
 
-	getExportedArticles(): exportedArticles[] {
-		const srcDir = path.join(this.site.saveDir);
-		if (!fs.existsSync(srcDir)) {
-			console.warn(`Directory ${this.site.saveDir} does not exist.  Skipping exported article check.`);
-			return [];
-		}
-		//  throw new Error(`Directory ${srcDir} does not exist.`);
+	getPageURLs(): void {
+		assertExists<string>(this.site.lastUrlSelector);
+		assertExists<number>(this.site.startingPageNumber);
+		assertExists<string>(this.site.lastPageNumberRegExp);
 
+		const lastElem = this.currentUrlDOM.querySelector(this.site.lastUrlSelector);
+		assertExists<Element>(lastElem);
+
+		const lastUrl = lastElem.getAttribute("href");
+		assertExists<string>(lastUrl);
+
+		const lpnRegExp = new RegExp(this.site.lastPageNumberRegExp);
+
+		const lpnResult = lastUrl.match(lpnRegExp);
+		if (!lpnResult) throw new Error(`RegExp failed ${this.site.lastPageNumberRegExp}`);
+		const lastPageNumber = Number(lpnResult[1]);
+
+		const nextPage = this.site.startingPageNumber !== 1 ? this.site.startingPageNumber : 2;
+		assertExists<number>(nextPage);
+
+		for (let i = nextPage; i <= lastPageNumber; i++) {
+			this.siteURLs.push(lastUrl.replace(lpnRegExp, `/page/${i}/`));
+		}
+	}
+
+	getExportedArticles(): exportedArticles[] {
 		try {
 			return fs
-				.readdirSync(srcDir, { withFileTypes: true, encoding: "utf-8" })
+				.readdirSync(this.site.saveDir, { withFileTypes: true, encoding: "utf-8" })
 				.filter((dirent) => dirent.isFile() && dirent.name.endsWith(".txt"))
 				.map((dirent) => {
-					const file = fs.readFileSync(path.join(srcDir, dirent.name), {
+					const file = fs.readFileSync(path.join(this.site.saveDir, dirent.name), {
 						encoding: "utf-8",
 					});
 					return JSON.parse(file);
@@ -163,13 +174,15 @@ export default class Scraper {
 					return { name: article.name, id: article.id, url: article.url };
 				});
 		} catch (err) {
-			throw new Error(`Failed to read files from ${srcDir}. ${err}`);
+			throw new Error(`Failed to read files from ${this.site.saveDir}. ERROR: ${err}`);
 		}
 	}
 
-	getTags(doc: Element | Document, selector: string): string[] | false {
+	getTags(doc: Element | Document, selector: string): string[] {
 		const elements = doc.querySelectorAll(selector);
-		if (elements.length === 0) return false;
+
+		if (elements.length === 0) return [];
+
 		const tags = [];
 		for (const el of elements) {
 			if (el.textContent) tags.push(el.textContent);
@@ -183,7 +196,13 @@ export default class Scraper {
 		return vldt.isCommonValue<string[]>(this.site.tags, tags);
 	}
 
-	async getDom(url: string): Promise<Document> {
+	/**
+	 *
+	 * @param url <string> - URL
+	 * @returns dom <Document> - Returns the DOM of the passed url
+	 */
+
+	async getDOM(url: string): Promise<Document> {
 		if (!url || !vldt.isURL(url)) {
 			throw new Error(`${url} is not a valid URL.`);
 		}
@@ -214,18 +233,13 @@ export default class Scraper {
 		return /^https/.test(href) ? href : this.site.rootUrl + href;
 	}
 
-	async getLinksFromIndex(): Promise<string[]> {
-
+	getLinksFromIndex(): string[] {
 		assertExists<string>(this.site.indexLinkBlockSelector);
 		assertExists<string>(this.site.indexLinkSelector);
+		assertExists<string>(this.site.indexTagSelector);
 
-
-		const dom = await this.getDom(this.currentURL.href);
-
-		const indexBlocks = dom.querySelectorAll(this.site.indexLinkBlockSelector);
-		if (indexBlocks.length === 0) {
-			throw new Error(`Could not capture index blocks on ${this.currentURL.href} using ${this.site.indexLinkBlockSelector}`);
-		}
+		const indexBlocks = this.currentUrlDOM.querySelectorAll(this.site.indexLinkBlockSelector);
+		assertExists<NodeListOf<Element>>(indexBlocks);
 
 		const links = [];
 		let exportedCnt = 0;
@@ -244,16 +258,17 @@ export default class Scraper {
 			}
 
 			/**Tag filtering */
-			if (this.site.tagFiltering && this.site.indexTagSelector) {
+			if (this.site.tagFiltering) {
 				const tags = this.getTags(block, this.site.indexTagSelector);
 				if (!vldt.isCommonValue(tags, this.site.tags)) continue;
 			}
+
 			links.push(url);
 		}
 
 		/** Exit if all links found on index pages are already being exported */
 		if (indexBlocks.length === exportedCnt) {
-			this.foundNewArticles = false;
+			this.close();
 		}
 
 		return links;
@@ -269,7 +284,7 @@ export default class Scraper {
 		}
 
 		const urlObj = new URL(url);
-		const dom = await this.getDom(url);
+		const dom = await this.getDOM(url);
 
 		const _title = dom.querySelector(this.site.articleTitleSelector);
 		const title = _title ? (_title.childNodes[0].nodeValue ? _title.childNodes[0].nodeValue.trim() : "") : "";
@@ -302,7 +317,7 @@ export default class Scraper {
 		}
 
 		const urlObj = new URL(url);
-		const dom = await this.getDom(url);
+		const dom = await this.getDOM(url);
 
 		const articles = dom.querySelectorAll(this.site.articleBlockSelector);
 
@@ -330,13 +345,24 @@ export default class Scraper {
 			this.acquiredArticles.push(newArticle);
 		}
 	}
+	/* delete
 
 	async isNextPage(): Promise<boolean> {
+		switch (this.site.nextPageType) {
+			//last
+			case "last":
+				return this.siteURLs.length > 0 ? true : false;
+
+			//next
+			case "next":
+				return (await this.isNextPage()) ? true : false;
+		}
+
 		if (this.currentURL.href === this.nextUrl) await this.getNextUrl();
 		if (!this.nextUrl) return false;
 
 		try {
-			await this.getDom(this.nextUrl);
+			await this.getDOM(this.nextUrl);
 			return true;
 		} catch (err) {
 			return false;
@@ -354,39 +380,51 @@ export default class Scraper {
 				console.warn(`gotoNextPage() failed.  currentURL=${this.currentURL}; attempted nextUrl=${this.nextUrl}`);
 			});
 	}
+**/
 
-	async getNextUrl() {
-		let nextUrl;
-		const dom = await this.getDom(this.currentURL.href);
+	getNextUrl(): string | undefined {
+		switch (this.site.nextPageType) {
+			//last
+			case "last":
+				return this.siteURLs.length > 0 ? this.siteURLs.pop() : "";
 
-		if (this.site.nextPageType === "next" && this.site.nextPageLinkSelector) {
-			const linkElem = dom.querySelector(this.site.nextPageLinkSelector);
-			if (!linkElem) {
-				throw new Error(`Failed to get next link from ${this.currentURL} using ${this.site.nextPageLinkSelector}`);
+			//next
+			case "next": {
+				assertExists<string>(this.site.nextPageLinkSelector);
+
+				const linkElem = this.currentUrlDOM.querySelector(this.site.nextPageLinkSelector);
+				assertExists<Element>(linkElem);
+
+				const nextPageUrl = this.extractLink(linkElem);
+				assertExists<string>(nextPageUrl);
+
+				return nextPageUrl;
 			}
 
-			nextUrl = this.extractLink(linkElem);
-		}
+			//pagenation
+			case "pagenation": {
+				assertExists<string>(this.site.nextPageLinkSelector);
 
-		if (this.site.nextPageType === "pagenation" && this.site.nextPageLinkSelector) {
-			const linkElems = dom.querySelectorAll(this.site.nextPageLinkSelector);
-			if (!linkElems) {
-				throw new Error(`Failed to get links from ${this.currentURL} using ${this.site.nextPageLinkSelector}`);
-			}
+				const linkElems = this.currentUrlDOM.querySelectorAll(this.site.nextPageLinkSelector);
+				assertExists<NodeListOf<Element>>(linkElems);
 
-			for (const el of linkElems) {
-				if (Number(el.textContent) === this.currentPageNumber + 1) {
-					nextUrl = this.extractLink(el);
-					break;
+				for (const el of linkElems) {
+					if (Number(el.textContent) === this.currentPageNumber + 1) {
+						return this.extractLink(el);
+					}
 				}
+
+				return "";
 			}
-		}
 
-		if (this.site.nextPageType === "parameter" && this.site.nextPageParameter) {
-			nextUrl = this.incrementUrlParameter();
-		}
+			//parameter
+			case "parameter": {
+				return this.incrementUrlParameter();
+			}
 
-		this.nextUrl = nextUrl;
+			default:
+				return "";
+		}
 	}
 
 	incrementUrlParameter(): string {
@@ -417,14 +455,21 @@ export default class Scraper {
 		}
 	}
 
-	exportContent(contents: articles[]): void {
-		for (const content of contents) {
-			const exportPath = path.join(this.site.saveDir, `${content.name}__${content.id}.txt`);
-			try {
-				fs.writeFileSync(exportPath, JSON.stringify(content));
-			} catch (err) {
-				console.log(err);
-			}
+	exportFailedUrls(): void {
+		if (this.failedURLs.length === 0) return;
+		const exportPath = path.join(this.site.saveDir, `${this.site.name}__failedURLs__${Date.now()}.txt`);
+
+		try {
+			fs.writeFileSync(exportPath, this.failedURLs.join("\n"));
+		} catch (err) {
+			console.error(`Failed to export failed URLs.  ERROR: ${err}`);
 		}
+	}
+
+	close(): void {
+		this.exportArticles();
+		this.exportFailedUrls();
+		console.log("Existing Program.");
+		process.exit();
 	}
 }
