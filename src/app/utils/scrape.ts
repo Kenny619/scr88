@@ -5,9 +5,9 @@ import { JSDOM, ResourceLoader } from "jsdom";
 //types
 import { articles, exportedArticles, site } from "../../typings/index.js";
 import _error from "./errorHandler.js";
-import { assertExists, exists } from "./exist.js";
 //local utilities
 import validateSiteInputs from "./srcWebsiteValidation.js";
+import { assertExists, exists, isElement } from "./typeGuards.js";
 import userAgent from "./userAgents.js";
 import * as vldt from "./validator.js";
 
@@ -62,7 +62,14 @@ export default class Scraper {
 		this.failedURLs = [];
 	}
 
-	debug(): object {
+	async debug(): Promise<object> {
+		/** get current dom */
+		this.currentUrlDOM = await this.getDOM(this.currentURL.href);
+
+		/** get siteURLs */
+		if (this.site.nextPageType === "last") {
+			this.getPageURLs();
+		}
 		return this;
 	}
 
@@ -75,62 +82,46 @@ export default class Scraper {
 			this.getPageURLs();
 		}
 
-		switch (this.site.siteType) {
-			case "links":
-				await this.scrapeIndex();
-				break;
+		let nextUrl: string | undefined;
 
-			case "singleArticle":
-				await this.scrapeSingle();
-				break;
-
-			case "multipleArticle":
-				await this.scrapeMultiples();
-				break;
-		}
-	}
-
-	//Scrape index
-	async scrapeIndex(): Promise<void> {
 		do {
-			const articleLinks = this.getLinksFromIndex();
-			this.linkQueue.push(...articleLinks);
-			if (await this.isNextPage()) {
-				this.gotoNextPage();
-			} else {
-				break;
+
+			switch (this.site.siteType) {
+
+				case "links": {
+					const articleLinks = this.getLinksFromIndex();
+					if (articleLinks) {
+						const scrapers = articleLinks.map(link => this.scrapeArticleIndex(link));
+						Promise.all(scrapers);
+					}
+					break;
+				}
+
+				case "multipleArticle": {
+					this.scrapeArticleMultiple();
+					break;
+				}
+
+				case "singleArticle": {
+					this.scrapeArticleSingle();
+					break;
+				}
 			}
-		} while (this.foundNewArticles);
 
-		if (this.linkQueue.length > 0) {
-			for (const link of this.linkQueue) {
-				this.scrapeArticle(link);
+			nextUrl = this.getNextUrl();
+			if (nextUrl) {
+				try {
+					await this.gotoNextUrl(nextUrl);
+				} catch (err) {
+					this.warnings.push(`Failed to transition to ${nextUrl}`);
+					this.failedURLs.push(nextUrl);
+					nextUrl = undefined;
+				}
 			}
-		}
-	}
 
-	async scrapeSingle(): Promise<void> {
-		do {
-			this.scrapeArticle(this.currentURL.href);
+		} while (nextUrl);
 
-			if (await this.isNextPage()) {
-				this.gotoNextPage();
-			} else {
-				break;
-			}
-		} while (this.foundNewArticles);
-	}
-
-	async scrapeMultiples(): Promise<void> {
-		do {
-			this.scrapeMultipleArticles(this.currentURL.href);
-
-			if (await this.isNextPage()) {
-				this.gotoNextPage();
-			} else {
-				break;
-			}
-		} while (this.foundNewArticles);
+		this.close();
 	}
 
 	getPageURLs(): void {
@@ -217,7 +208,9 @@ export default class Scraper {
 			const jd = await JSDOM.fromURL(url, { resources: loader });
 			dom = jd.window.document;
 		} catch (err) {
-			throw new Error(`Failed to access url ${url}.\n ${err}`);
+			this.warnings.push(`Failed to access url ${url}.\n ${err}`);
+			this.failedURLs.push(url);
+			throw new Error("getDOM failed.");
 		}
 
 		return dom;
@@ -236,7 +229,6 @@ export default class Scraper {
 	getLinksFromIndex(): string[] {
 		assertExists<string>(this.site.indexLinkBlockSelector);
 		assertExists<string>(this.site.indexLinkSelector);
-		assertExists<string>(this.site.indexTagSelector);
 
 		const indexBlocks = this.currentUrlDOM.querySelectorAll(this.site.indexLinkBlockSelector);
 		assertExists<NodeListOf<Element>>(indexBlocks);
@@ -259,6 +251,7 @@ export default class Scraper {
 
 			/**Tag filtering */
 			if (this.site.tagFiltering) {
+				assertExists<string>(this.site.indexTagSelector);
 				const tags = this.getTags(block, this.site.indexTagSelector);
 				if (!vldt.isCommonValue(tags, this.site.tags)) continue;
 			}
@@ -278,109 +271,104 @@ export default class Scraper {
 		return this.acquiredArticles;
 	}
 
-	async scrapeArticle(url: string): Promise<void> {
-		if (!url || vldt.isURL(url)) {
-			throw new Error(`${url} is not a valid URL.`);
-		}
+	extractArticle(dom: Document | Element, url: string = this.currentURL.href): Promise<articles> {
 
-		const urlObj = new URL(url);
-		const dom = await this.getDOM(url);
+		return new Promise((resolve, reject) => {
 
-		const _title = dom.querySelector(this.site.articleTitleSelector);
-		const title = _title ? (_title.childNodes[0].nodeValue ? _title.childNodes[0].nodeValue.trim() : "") : "";
-		const body = dom.querySelector(this.site.articleBodySelector)?.textContent ?? "";
-		const id = urlObj.pathname.split("/").pop() || urlObj.href;
+			const msg = `Failed to extract article from ${url}`;
 
-		const newArticle: articles = {
-			name: this.site.name,
-			id,
-			url: urlObj.href,
-			title,
-			body,
-		};
+			const titleElem = dom.querySelector(this.site.articleTitleSelector);
+			if (!isElement(titleElem)) reject(msg);
 
-		if (this.site.tagCollect && this.site.articleTagSelector) {
-			const _tags = this.getTags(dom, this.site.articleTagSelector);
-			if (_tags) newArticle.tags = _tags;
-		}
+			const title = (titleElem as Element).childNodes[0].nodeValue;
+			if (!exists<string>(title)) reject(msg);
 
-		this.acquiredArticles.push(newArticle);
-	}
+			const bodyElem = dom.querySelector(this.site.articleBodySelector);
+			if (!isElement(bodyElem)) reject(msg);
 
-	async scrapeMultipleArticles(url: string): Promise<void> {
-		if (!url || vldt.isURL(url)) {
-			throw new Error(`${url} is not a valid URL.`);
-		}
+			const body = (bodyElem as Element).textContent;
+			if (!exists<string>(body)) reject(msg);
 
-		if (!this.site.articleBlockSelector) {
-			throw new Error(`Invalid articleBlockSelector ${this.site.articleBlockSelector}`);
-		}
 
-		const urlObj = new URL(url);
-		const dom = await this.getDOM(url);
-
-		const articles = dom.querySelectorAll(this.site.articleBlockSelector);
-
-		if (articles.length === 0) return;
-
-		for (const article of articles) {
-			const _title = article.querySelector(this.site.articleTitleSelector);
-			const title = _title ? (_title.childNodes[0].nodeValue ? _title.childNodes[0].nodeValue.trim() : "") : "";
-			const body = article.querySelector(this.site.articleBodySelector)?.textContent ?? "";
+			const urlObj = new URL(url);
 			const id = urlObj.pathname.split("/").pop() || urlObj.href;
 
 			const newArticle: articles = {
 				name: this.site.name,
 				id,
 				url: urlObj.href,
-				title,
-				body,
+				title: title as string,
+				body: body as string
 			};
 
 			if (this.site.tagCollect && this.site.articleTagSelector) {
-				const _tags = this.getTags(article, this.site.articleTagSelector);
+				const _tags = this.getTags(dom, this.site.articleTagSelector);
 				if (_tags) newArticle.tags = _tags;
 			}
 
-			this.acquiredArticles.push(newArticle);
-		}
-	}
-	/* delete
+			resolve(newArticle);
 
-	async isNextPage(): Promise<boolean> {
-		switch (this.site.nextPageType) {
-			//last
-			case "last":
-				return this.siteURLs.length > 0 ? true : false;
+		});
 
-			//next
-			case "next":
-				return (await this.isNextPage()) ? true : false;
-		}
-
-		if (this.currentURL.href === this.nextUrl) await this.getNextUrl();
-		if (!this.nextUrl) return false;
-
-		try {
-			await this.getDOM(this.nextUrl);
-			return true;
-		} catch (err) {
-			return false;
-		}
 	}
 
-	gotoNextPage(): void {
-		this.isNextPage()
-			.then(() => {
-				if (this.nextUrl) {
-					this.currentURL = new URL(this.nextUrl);
-				}
-			})
-			.catch(() => {
-				console.warn(`gotoNextPage() failed.  currentURL=${this.currentURL}; attempted nextUrl=${this.nextUrl}`);
+	async scrapeArticleIndex(url: string): Promise<void> {
+
+		const dom = await this.getDOM(url);
+
+		this.extractArticle(dom, url)
+			.then(article => this.acquiredArticles.push(article))
+			.catch(err => {
+				this.warnings.push(err);
+				this.failedURLs.push(url);
+			});
+
+	}
+
+	scrapeArticleSingle(): void {
+		this.extractArticle(this.currentUrlDOM, this.currentURL.href)
+			.then(article => this.acquiredArticles.push(article))
+			.catch(err => {
+				this.warnings.push(err);
+				this.failedURLs.push(this.currentURL.href);
 			});
 	}
-**/
+
+	scrapeArticleMultiple(): void {
+
+		assertExists<string>(this.site.articleBlockSelector);
+
+		const articlesElem = this.currentUrlDOM.querySelectorAll(this.site.articleBlockSelector);
+		if (articlesElem.length === 0) {
+			this.warnings.push(`Failed to extract article from ${this.currentURL.href}`);
+			return;
+		}
+
+		for (const el of articlesElem) {
+			this.extractArticle(el, this.currentURL.href)
+				.then(article => this.acquiredArticles.push(article))
+				.catch(err => {
+					this.warnings.push(err);
+					this.failedURLs.push(this.currentURL.href);
+				});
+		}
+	}
+
+	async gotoNextUrl(nextUrl: string): Promise<void> {
+		if (!nextUrl) {
+			throw new Error(`Invalid next URL ${nextUrl}`);
+		}
+
+		this.currentURL = new URL(nextUrl);
+
+		try {
+			this.currentUrlDOM = await this.getDOM(this.currentURL.href);
+		} catch (err) {
+			throw new Error(`gotoNextUrl failed.  Failed to acquire DOM from ${this.currentURL.href}`);
+		}
+
+		this.currentPageNumber++;
+	}
 
 	getNextUrl(): string | undefined {
 		switch (this.site.nextPageType) {
@@ -393,12 +381,11 @@ export default class Scraper {
 				assertExists<string>(this.site.nextPageLinkSelector);
 
 				const linkElem = this.currentUrlDOM.querySelector(this.site.nextPageLinkSelector);
-				assertExists<Element>(linkElem);
+				if (!isElement(linkElem)) return "";
 
 				const nextPageUrl = this.extractLink(linkElem);
-				assertExists<string>(nextPageUrl);
+				return exists<string>(nextPageUrl) ? nextPageUrl : "";
 
-				return nextPageUrl;
 			}
 
 			//pagenation
@@ -406,7 +393,7 @@ export default class Scraper {
 				assertExists<string>(this.site.nextPageLinkSelector);
 
 				const linkElems = this.currentUrlDOM.querySelectorAll(this.site.nextPageLinkSelector);
-				assertExists<NodeListOf<Element>>(linkElems);
+				if (!exists<NodeListOf<Element>>(linkElems)) return "";
 
 				for (const el of linkElems) {
 					if (Number(el.textContent) === this.currentPageNumber + 1) {
@@ -428,15 +415,17 @@ export default class Scraper {
 	}
 
 	incrementUrlParameter(): string {
-		if (!this.site.nextPageParameter) {
-			throw new Error(`Invalid nextPageParameter ${this.site.nextPageParameter}`);
-		}
+
+		assertExists<string>(this.site.nextPageParameter);
+
 		const params = this.currentURL.searchParams;
 		if (Object.keys(params).length === 0 || !params.has(this.site.nextPageParameter)) {
 			params.set(this.site.nextPageParameter, "2");
 		} else {
 			for (const [key, val] of Array.from(params)) {
-				key === this.site.nextPageParameter ? params.set(key, String(Number(val) + 1)) : params.set(key, val);
+				key === this.site.nextPageParameter
+					? params.set(key, String(Number(val) + 1))
+					: params.set(key, val);
 			}
 		}
 		const updatedQueryString = params.toString();
@@ -450,7 +439,7 @@ export default class Scraper {
 			const exportPath = path.join(this.site.saveDir, `${article.name}__${article.id}.txt`);
 
 			fs.writeFile(exportPath, JSON.stringify(article), (err) => {
-				console.error(`Failed to export ${article}.  ERROR: ${err}`);
+				this.warnings.push(`Failed to export ${article}.  ERROR: ${err}`);
 			});
 		}
 	}
@@ -469,6 +458,7 @@ export default class Scraper {
 	close(): void {
 		this.exportArticles();
 		this.exportFailedUrls();
+		console.warn(this.warnings.join("\n"));
 		console.log("Existing Program.");
 		process.exit();
 	}

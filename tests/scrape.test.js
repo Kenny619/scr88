@@ -8,8 +8,8 @@ const enigma = {
 	language: "JP",
 	saveDir: "./exports",
 	siteType: "links",
-	nextPageType: "next",
-	nextPageLinkSelector: "ul.pagenation > li.next > a",
+	nextPageType: "last",
+	nextPageLinkSelector: "ul.pagination > li.last > a",
 
 	tagFiltering: false,
 	tagCollect: true,
@@ -26,16 +26,18 @@ const enigma = {
 };
 
 const scr = new Scraper(enigma);
-//scr.scrape();
-console.log(scr.debug());
+const t = await scr.debug();
+console.log(t);
 
 test("constructor", async () => {
 	expect(scr.debug()).toBeTruthy();
 });
 
 test("getLinksFromIndex", async () => {
-	expect((await scr.getLinksFromIndex()).length).toBeGreaterThan(0);
-	console.log(await scr.getLinksFromIndex());
+	expect(scr.getLinksFromIndex().length).toBeGreaterThan(0);
+	console.log(scr.getLinksFromIndex());
 });
 
-test("getUrls");
+// test("getPageURLs", () => {
+// 	expect(scr.getPa)
+// });
