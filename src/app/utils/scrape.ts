@@ -70,6 +70,10 @@ export default class Scraper {
 		if (this.site.nextPageType === "last") {
 			this.getPageURLs();
 		}
+
+		/**
+		 * leave only 3 urls and delete the rest.  Run scrape.
+		 */
 		return this;
 	}
 
