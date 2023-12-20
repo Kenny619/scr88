@@ -6,6 +6,7 @@ const enigma = {
 	entryUrl: "https://enigma2.ahoseek.com/",
 	language: "JP",
 	saveDir: "./exports",
+	logDir: "./logs",
 	siteType: "links",
 	nextPageType: "next",
 	nextPageLinkSelector: "ul.pagenation > li.next > a",

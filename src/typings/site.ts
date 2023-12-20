@@ -1,5 +1,4 @@
 export interface site {
-
 	/** required ------------------------------------- */
 
 	//name of the project
@@ -13,6 +12,9 @@ export interface site {
 
 	//Output dir path
 	saveDir: string;
+
+	//Log output dir path
+	logDir: string;
 
 	//Language of the source site.  Output file
 	language: "JP" | "EN";
@@ -29,7 +31,6 @@ export interface site {
 	//If nextPageType = "last" | RegExp for getting the last page number
 	lastPageNumberRegExp?: string;
 
-
 	//If true, scrape articles that has matching tags to tags parameter
 	tagFiltering: boolean;
 
@@ -41,7 +42,6 @@ export interface site {
 
 	//CSS selector for the body of the article
 	articleBodySelector: string;
-
 
 	/** optional: Next Page parameters ------------- */
 
@@ -57,7 +57,6 @@ export interface site {
 	//if nextPageType === "pagenation" && starting page is not the top/first page.
 	startingPageNumber?: number;
 
-
 	/** optional: Tags ----------------------------- */
 
 	//if tagFiltering is true.  Tags used to filter the articles
@@ -68,7 +67,6 @@ export interface site {
 
 	//if tagFiltering is true OR tagCollection is true | CSS selector for the tags
 	articleTagSelector?: string;
-
 
 	/** optional: siteType parameters ----------------------------- */
 
