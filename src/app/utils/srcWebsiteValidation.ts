@@ -33,8 +33,8 @@ export default function validateSiteInputs(site: site): string[] {
 	}
 
 	//URL format check
-	if (!vldt.isURL(site.rootUrl)) errorMsgs.push(`${site.rootUrl} is not a valid URL.`);
-	if (!vldt.isURL(site.entryUrl)) errorMsgs.push(`${site.entryUrl} is not a valid URL.`);
+	// if (!vldt.isURL(site.rootUrl)) errorMsgs.push(`${site.rootUrl} is not a valid URL.`);
+	// if (!vldt.isURL(site.entryUrl)) errorMsgs.push(`${site.entryUrl} is not a valid URL.`);
 
 	//Static string value check
 	if (!["EN", "JP"].includes(site.language)) errorMsgs.push("Language needs to be either 'JP' or 'EN'.");

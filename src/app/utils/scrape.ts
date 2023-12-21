@@ -7,7 +7,7 @@ import { articles, exportedArticles, site } from "../../typings/index.js";
 import _error from "./errorHandler.js";
 //local utilities
 import validateSiteInputs from "./srcWebsiteValidation.js";
-import { assertExists, exists, isElement } from "./typeGuards.js";
+import { assertExists, exists, } from "./typeGuards.js";
 import userAgent from "./userAgents.js";
 import * as vldt from "./validator.js";
 
@@ -28,10 +28,10 @@ export default class Scraper {
 	protected siteURLs: string[];
 	//pageURLs for link type site
 	protected pageURLs: string[];
-	//warning messages
-	protected warnings: string[];
-	//Failed URLs
-	protected failedURLs: string[];
+	//Error messages
+	protected errors: string[];
+	//Exported article count
+	protected exportedCnt: number;
 
 	constructor(srcWebsite: site) {
 		// srcWebsite validation
@@ -55,82 +55,78 @@ export default class Scraper {
 		this.currentPageNumber = this.site.startingPageNumber;
 
 		// list of URLs to be scraped.  Only used when nextUrlType = last
-		this.siteURLs = [];
+		this.siteURLs = [this.site.entryUrl];
+
+		// List of URLs to be scraped.  Acquired from index page.
 		this.pageURLs = [];
 
-		//warnings
-		this.warnings = [];
-
-		//failed URLs
-		this.failedURLs = [];
+		//Error messages
+		this.errors = [];
 
 		//Acquired articles
 		this.acquiredArticles = [];
+
+		//Exported count
+		this.exportedCnt = 0;
 	}
 
-	async debug(): Promise<object> {
-		/** get current dom */
-		this.currentUrlDOM = await this.getDOM(this.currentURL.href);
 
-		/** get siteURLs */
-		if (this.site.nextPageType === "last") {
-			this.getPageURLs();
-		}
 
-		/**
-		 * leave only 3 urls and delete the rest.  Run scrape.
-		 */
+	getSiteURLs(): void {
+		/** Configure UserAgent */
+		const loader = new ResourceLoader({
+			userAgent: userAgent(),
+		});
 
-		this.siteURLs.splice(2, this.siteURLs.length - 2);
+		JSDOM.fromURL(this.site.entryUrl, { resources: loader })
+			.then((jd) => {
+				const dom = jd.window.document;
 
-		return this;
+				const lastURL = this.getLastURL(dom);
+				assertExists<string>(lastURL);
+
+				assertExists<string>(this.site.lastPageNumberRegExp);
+				assertExists<number>(this.site.startingPageNumber);
+
+				const lpnRegExp = new RegExp(this.site.lastPageNumberRegExp);
+				const lpnResult = lastURL.match(lpnRegExp);
+
+				assertExists<object>(lpnResult);
+				const lastPageNumber = Number(lpnResult[1]);
+
+				const nextPage = this.site.startingPageNumber !== 1 ? this.site.startingPageNumber : 2;
+				assertExists<number>(nextPage);
+
+				for (let i = nextPage; i <= lastPageNumber; i++) {
+					this.siteURLs.push(lastURL.replace(String(lastPageNumber), String(i)));
+				}
+
+				this.getPageURLfromIndex();
+			})
+			.catch((err) => {
+				this.logError(this.site.entryUrl, this.getSiteURLs.name, "JSDOM failed.", err);
+			});
 	}
 
-	async scrape(): Promise<void> {
-		/** get current dom */
-		if (!this.currentUrlDOM) this.currentUrlDOM = await this.getDOM(this.currentURL.href);
 
-		/** get siteURLs */
-		if (this.site.nextPageType === "last" && !this.siteURLs) this.getPageURLs();
+	getLastURL(dom: Document | Element): string | null {
 
-		let nextUrl: string | undefined;
+		assertExists<string>(this.site.lastUrlSelector);
 
-		do {
-			switch (this.site.siteType) {
-				case "links": {
-					this.scrapeArticleLinks();
-					break;
-				}
+		const lastElem = dom.querySelector(this.site.lastUrlSelector);
+		assertExists<Element>(lastElem);
 
-				case "multipleArticle": {
-					this.scrapeArticleMultiple();
-					break;
-				}
-
-				case "singleArticle": {
-					this.scrapeArticleSingle();
-					break;
-				}
-			}
-
-			nextUrl = this.getNextUrl();
-			if (nextUrl) {
-				try {
-					await this.gotoNextUrl(nextUrl);
-				} catch (err) {
-					this.warnings.push(`Failed to transition to ${nextUrl}`);
-					this.failedURLs.push(nextUrl);
-					nextUrl = undefined;
-				}
-			}
-		} while (nextUrl);
-
-		this.close();
+		return lastElem.getAttribute("href");
 	}
 
-	getPageURLfromIndex(indexURL: string): void {
-		if (!indexURL || !vldt.isURL(indexURL)) {
-			this.warnings.push(`${url} is not a valid URL.`);
+	getPageURLfromIndex(): void {
+
+		if (this.siteURLs.length === 0) return;
+		const indexURL = this.siteURLs.shift();
+
+
+		if (!indexURL) {
+			this.logError(indexURL as string, this.getPageURLfromIndex.name, "Invalid URL", "");
 			return;
 		}
 
@@ -159,7 +155,8 @@ export default class Scraper {
 					const pageURL = /^https/.test(link) ? link : this.site.rootUrl + link;
 
 					/** Exit if the url already exist in exportedArticles. */
-					if (this.exportedArticles.length > 0 && this.exportedArticles.find((obj) => `${obj.url}/` === pageURL)) {
+					if (this.exportedArticles.length > 0 && this.exportedArticles.find((obj) => obj.url === pageURL)) {
+						console.log(`${link} already exists.`);
 						exportedCnt++;
 						continue;
 					}
@@ -167,48 +164,79 @@ export default class Scraper {
 					/**Tag filtering */
 					if (this.site.tagFiltering) {
 						assertExists<string>(this.site.indexTagSelector);
-						const tags = this.getTags(block, this.site.indexTagSelector);
-						if (!vldt.isCommonValue(tags, this.site.tags)) continue;
+						if (!this.isTagIncluded(indexURL, block, this.site.indexTagSelector)) continue;
 					}
 
 					this.pageURLs.push(pageURL);
+					this.scrapeArticle();
+
 				}
+
 
 				if (indexBlocks.length === exportedCnt) {
 					/** Exit if all links found on index pages are already being exported */
 					this.siteURLs = [];
+					this.pageURLs.length > 0 ? this.scrapeArticle() : this.close();
+					return;
 				}
+
+				if (this.siteURLs.length > 0) this.getPageURLfromIndex();
+
 			})
-			.catch((err) => {
-				this.warnings.push(`Failed to access url ${indexURL}.\n ${err}`);
-				this.failedURLs.push(indexURL);
-			});
+			.catch((err) => this.logError(indexURL, this.getPageURLfromIndex.name, "JSDOM error", err));
 	}
 
-	getPageURLs(): void {
-		assertExists<string>(this.site.lastUrlSelector);
-		assertExists<number>(this.site.startingPageNumber);
-		assertExists<string>(this.site.lastPageNumberRegExp);
+	isTagIncluded(url: string, el: Element, selector: string): boolean {
 
-		const lastElem = this.currentUrlDOM.querySelector(this.site.lastUrlSelector);
-		assertExists<Element>(lastElem);
-
-		const lastUrl = lastElem.getAttribute("href");
-		assertExists<string>(lastUrl);
-
-		const lpnRegExp = new RegExp(this.site.lastPageNumberRegExp);
-
-		const lpnResult = lastUrl.match(lpnRegExp);
-		if (!lpnResult) throw new Error(`RegExp failed ${this.site.lastPageNumberRegExp}`);
-		const lastPageNumber = Number(lpnResult[1]);
-
-		const nextPage = this.site.startingPageNumber !== 1 ? this.site.startingPageNumber : 2;
-		assertExists<number>(nextPage);
-
-		for (let i = nextPage; i <= lastPageNumber; i++) {
-			this.siteURLs.push(lastUrl.replace(lpnRegExp, `/page/${i}/`));
+		if (!(el instanceof Element) || typeof selector !== 'string') {
+			this.logError(url, this.isTagIncluded.name, `Invalid args. el:${el}, selector:${selector}`, "");
+			return false;
 		}
+
+		const tagsOnPage = this.getTags(el, selector);
+		if (!tagsOnPage) {
+			this.logError(url, this.isTagIncluded.name, `getTags returned ${tagsOnPage}`, "");
+			return false;
+		}
+
+		return vldt.isCommonValue(tagsOnPage, this.site.tags) ? true : false;
 	}
+
+
+	scrapeArticle(): void {
+
+		if (!this.pageURLs && !this.siteURLs) {
+			this.close();
+		}
+
+		const url = this.pageURLs.shift();
+		if (!url) {
+			this.logError(url as string, this.scrapeArticle.name, "Invalid URL", "");
+			return;
+		}
+
+		/** Configure UserAgent */
+		const loader = new ResourceLoader({
+			userAgent: userAgent(),
+		});
+
+		//delete
+		console.log(`start scraping on ${url}`);
+
+		JSDOM.fromURL(url, { resources: loader })
+			.then((jd) => {
+				const dom = jd.window.document;
+				this.extractArticle(dom, url)
+					.then((article) => {
+						this.acquiredArticles.push(article);
+						this.exportArticles();
+					})
+					.catch((err) => this.logError(url, this.scrapeArticle.name, "extractArticle failed", err));
+			})
+			.catch((err) => this.logError(url, this.scrapeArticle.name, "JSDOM failed", err));
+	}
+
+
 
 	getExportedArticles(): exportedArticles[] {
 		try {
@@ -226,7 +254,7 @@ export default class Scraper {
 					return { name: article.name, id: article.id, url: article.url };
 				});
 		} catch (err) {
-			throw new Error(`Failed to read files from ${this.site.saveDir}. ERROR: ${err}`);
+			throw new Error(`Failed to read files from ${this.site.saveDir}.ERROR: ${err}`);
 		}
 	}
 
@@ -248,34 +276,6 @@ export default class Scraper {
 		return vldt.isCommonValue<string[]>(this.site.tags, tags);
 	}
 
-	/**
-	 *
-	 * @param url <string> - URL
-	 * @returns dom <Document> - Returns the DOM of the passed url
-	 */
-
-	async getDOM(url: string): Promise<Document> {
-		if (!url || !vldt.isURL(url)) {
-			throw new Error(`${url} is not a valid URL.`);
-		}
-		let dom;
-
-		/** Configure UserAgent */
-		const loader = new ResourceLoader({
-			userAgent: await userAgent(),
-		});
-
-		try {
-			const jd = await JSDOM.fromURL(url, { resources: loader });
-			dom = jd.window.document;
-		} catch (err) {
-			this.warnings.push(`Failed to access url ${url}.\n ${err}`);
-			this.failedURLs.push(url);
-			throw new Error("getDOM failed.");
-		}
-
-		return dom;
-	}
 
 	extractLink(el: Element): string {
 		const href = el.getAttribute("href");
@@ -287,46 +287,7 @@ export default class Scraper {
 		return /^https/.test(href) ? href : this.site.rootUrl + href;
 	}
 
-	getLinksFromIndex(): string[] {
-		assertExists<string>(this.site.indexLinkBlockSelector);
-		assertExists<string>(this.site.indexLinkSelector);
 
-		const indexBlocks = this.currentUrlDOM.querySelectorAll(this.site.indexLinkBlockSelector);
-		assertExists<NodeListOf<Element>>(indexBlocks);
-
-		const links = [];
-		let exportedCnt = 0;
-		for (const block of indexBlocks) {
-			/** extract URL from index link block */
-			const linkElem = block.querySelector(this.site.indexLinkSelector);
-			if (!linkElem) continue;
-			const link = linkElem.getAttribute("href");
-			if (!link) continue;
-			const url = /^https/.test(link) ? link : this.site.rootUrl + link;
-
-			/** Exit if the url already exist in exportedArticles. */
-			if (this.exportedArticles.find((obj) => `${obj.url}/` === url)) {
-				exportedCnt++;
-				continue;
-			}
-
-			/**Tag filtering */
-			if (this.site.tagFiltering) {
-				assertExists<string>(this.site.indexTagSelector);
-				const tags = this.getTags(block, this.site.indexTagSelector);
-				if (!vldt.isCommonValue(tags, this.site.tags)) continue;
-			}
-
-			links.push(url);
-		}
-
-		/** Exit if all links found on index pages are already being exported */
-		if (indexBlocks.length === exportedCnt) {
-			this.close();
-		}
-
-		return links;
-	}
 
 	returnArticles(): articles[] {
 		return this.acquiredArticles;
@@ -342,7 +303,6 @@ export default class Scraper {
 
 			const titleElem = dom.querySelector(this.site.articleTitleSelector);
 			if (!titleElem) reject(msg);
-			//if (!isElement(titleElem)) reject(msg);
 
 			const title = (titleElem as Element).childNodes[0].nodeValue;
 			if (!exists<string>(title)) reject(msg);
@@ -354,7 +314,7 @@ export default class Scraper {
 			if (!exists<string>(body)) reject(msg);
 
 			const urlObj = new URL(url);
-			const id = urlObj.pathname.split("/")[-2] || urlObj.href;
+			const id = urlObj.pathname.replace(/\/$/, "").split("/").pop() ?? "";
 
 			const newArticle: articles = {
 				name: this.site.name,
@@ -373,148 +333,6 @@ export default class Scraper {
 		});
 	}
 
-	scrapeArticle(url: string): void {
-		if (!url || !vldt.isURL(url)) {
-			this.warnings.push(`${url} is not a valid URL.`);
-			return;
-		}
-
-		/** Configure UserAgent */
-		const loader = new ResourceLoader({
-			userAgent: userAgent(),
-		});
-
-		JSDOM.fromURL(url, { resources: loader })
-			.then((jd) => {
-				const dom = jd.window.document;
-				this.extractArticle(dom, url)
-					.then((article) => this.acquiredArticles.push(article))
-					.catch((err) => {
-						this.warnings.push(`extractArticle failed on ${url}.\n ${err}`);
-						this.failedURLs.push(url);
-					});
-			})
-			.catch((err) => {
-				this.warnings.push(`Failed to access url ${url}.\n ${err}`);
-				this.failedURLs.push(url);
-			});
-	}
-
-	async scrapeArticleLinks(): Promise<void> {
-		const articleLinks = this.getLinksFromIndex();
-		if (articleLinks.length === 0) return;
-
-		const scrapers = articleLinks.map(async (link) => {
-			const dom = await this.getDOM(link);
-			return this.extractArticle(dom, link)
-				.then((article) => this.acquiredArticles.push(article))
-				.catch((err) => {
-					this.warnings.push(err);
-					this.failedURLs.push(link);
-				});
-		});
-
-		await Promise.allSettled(scrapers);
-	}
-
-	async scrapeArticleIndex(url: string): Promise<void> {
-		const dom = await this.getDOM(url);
-
-		this.extractArticle(dom, url)
-			.then((article) => this.acquiredArticles.push(article))
-			.catch((err) => {
-				this.warnings.push(err);
-				this.failedURLs.push(url);
-			});
-	}
-
-	scrapeArticleSingle(): void {
-		this.extractArticle(this.currentUrlDOM, this.currentURL.href)
-			.then((article) => this.acquiredArticles.push(article))
-			.catch((err) => {
-				this.warnings.push(err);
-				this.failedURLs.push(this.currentURL.href);
-			});
-	}
-
-	scrapeArticleMultiple(): void {
-		assertExists<string>(this.site.articleBlockSelector);
-
-		const articlesElem = this.currentUrlDOM.querySelectorAll(this.site.articleBlockSelector);
-		if (articlesElem.length === 0) {
-			this.warnings.push(`Failed to extract article from ${this.currentURL.href}`);
-			return;
-		}
-
-		for (const el of articlesElem) {
-			this.extractArticle(el, this.currentURL.href)
-				.then((article) => this.acquiredArticles.push(article))
-				.catch((err) => {
-					this.warnings.push(err);
-					this.failedURLs.push(this.currentURL.href);
-				});
-		}
-	}
-
-	async gotoNextUrl(nextUrl: string): Promise<void> {
-		if (!nextUrl) {
-			throw new Error(`Invalid next URL ${nextUrl}`);
-		}
-
-		this.currentURL = new URL(nextUrl);
-
-		try {
-			this.currentUrlDOM = await this.getDOM(this.currentURL.href);
-		} catch (err) {
-			throw new Error(`gotoNextUrl failed.  Failed to acquire DOM from ${this.currentURL.href}`);
-		}
-
-		this.currentPageNumber++;
-	}
-
-	getNextUrl(): string | undefined {
-		switch (this.site.nextPageType) {
-			//last
-			case "last":
-				return this.siteURLs.length > 0 ? this.siteURLs.pop() : "";
-
-			//next
-			case "next": {
-				assertExists<string>(this.site.nextPageLinkSelector);
-
-				const linkElem = this.currentUrlDOM.querySelector(this.site.nextPageLinkSelector);
-				if (!isElement(linkElem)) return "";
-
-				const nextPageUrl = this.extractLink(linkElem);
-				return exists<string>(nextPageUrl) ? nextPageUrl : "";
-			}
-
-			//pagenation
-			case "pagenation": {
-				assertExists<string>(this.site.nextPageLinkSelector);
-
-				const linkElems = this.currentUrlDOM.querySelectorAll(this.site.nextPageLinkSelector);
-				if (!exists<NodeListOf<Element>>(linkElems)) return "";
-
-				for (const el of linkElems) {
-					if (Number(el.textContent) === this.currentPageNumber + 1) {
-						return this.extractLink(el);
-					}
-				}
-
-				return "";
-			}
-
-			//parameter
-			case "parameter": {
-				return this.incrementUrlParameter();
-			}
-
-			default:
-				return "";
-		}
-	}
-
 	incrementUrlParameter(): string {
 		assertExists<string>(this.site.nextPageParameter);
 
@@ -527,38 +345,64 @@ export default class Scraper {
 			}
 		}
 		const updatedQueryString = params.toString();
-		return `${this.currentURL.origin}${this.currentURL.pathname}?${updatedQueryString}${this.currentURL.hash}`;
+		return `${this.currentURL.origin}${this.currentURL.pathname} ? ${updatedQueryString}${this.currentURL.hash}`;
 	}
 
 	exportArticles(): void {
 		if (this.acquiredArticles.length === 0) return;
 
-		for (const article of this.acquiredArticles) {
-			const exportPath = path.join(this.site.saveDir, `${article.name}__${article.id}.txt`);
+		const article = this.acquiredArticles.shift();
+		assertExists<articles>(article);
+		const exportPath = path.join(this.site.saveDir, `${article.name}__${article.id}.txt`);
 
-			fs.writeFile(exportPath, JSON.stringify(article), (err) => {
-				this.warnings.push(`Failed to export ${article}.  ERROR: ${err}`);
-			});
-		}
+		fs.writeFile(exportPath, JSON.stringify(article), (err) => {
+			if (err) this.logError(article.url, this.exportArticles.name, `Failed to export ${article}`, err.message);
+
+			//increment exported count
+			this.exportedCnt++;
+
+			//Continue exoprting while acquiredArticles exist
+			if (this.acquiredArticles.length > 0) this.exportArticles();
+
+			//Close the program if articles and urls become empty
+			if (this.acquiredArticles.length > 0 && this.pageURLs.length === 0 && this.siteURLs.length === 0) this.close();
+		});
 	}
 
-	exportFailedUrls(): void {
-		if (this.failedURLs.length === 0) return;
-		const exportPath = path.join(this.site.logDir, `${this.site.name}__failedURLs__${Date.now()}.txt`);
+	appendErrorLog(): void {
+		if (this.errors.length === 0) return;
 
-		try {
-			fs.writeFileSync(exportPath, this.failedURLs.join("\n"));
-		} catch (err) {
-			console.error(`Failed to export failed URLs.  ERROR: ${err}`);
-		}
+		const failedURLs = this.errors.join("\n");
+		const exportPath = path.join(this.site.logDir, "errors.log");
+
+		fs.appendFile(exportPath, `${failedURLs} \n`, (err) => {
+			if (err) {
+				console.log("Failed to append errors to the log file.");
+				console.log(this.errors);
+			}
+		});
+
+	}
+
+	logError(url: string, method: string, msg: string, err: string): void {
+		const datetime = `${this.getDate()}:${this.getTime()}`;
+		this.errors.push(`${datetime}\t${url}\n${method}\n${msg}\n${err}`);
+	}
+
+	getDate(): string {
+		return new Date().toLocaleDateString("ja-JP", {
+			year: "numeric", month: "2-digit",
+			day: "2-digit"
+		}).replaceAll('/', "");
+	}
+
+	getTime(): string {
+		return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 	}
 
 	close(): void {
-		this.exportArticles();
-		this.exportFailedUrls();
-		console.log("WARNINGS:", this.warnings);
-		console.log("Existing Program.");
+		console.log(`Completed scraping site: ${this.site.name}.  Success:${this.exportedCnt} Errors:${this.errors.length}`);
+		if (this.errors.length > 0) this.appendErrorLog();
 		return;
-		//process.exit();
 	}
 }
