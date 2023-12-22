@@ -3,11 +3,11 @@ import path from "path";
 import { JSDOM, ResourceLoader } from "jsdom";
 
 //types
-import { articles, exportedArticles, site } from "../../typings/index.js";
+import { articles, site } from "../../typings/index.js";
 import _error from "./errorHandler.js";
 //local utilities
 import validateSiteInputs from "./srcWebsiteValidation.js";
-import { assertExists, exists, } from "./typeGuards.js";
+import { assertExists, exists } from "./typeGuards.js";
 import userAgent from "./userAgents.js";
 import * as vldt from "./validator.js";
 
@@ -15,7 +15,7 @@ export default class Scraper {
 	//source website parameters
 	protected site: site;
 	//Existing articles in site.saveDir
-	protected exportedArticles: exportedArticles[];
+	protected scrapedURLs!: string[];
 	//List of newly acquired contents ids
 	protected acquiredArticles!: articles[];
 	//current page URL object
@@ -44,11 +44,11 @@ export default class Scraper {
 		// source website parameters
 		this.site = srcWebsite;
 
-		// List of previously acquired contents ids
-		this.exportedArticles = this.getExportedArticles();
-
 		// currentURL
 		this.currentURL = new URL(this.site.entryUrl);
+
+		//scrapedURLs
+		this.getScrapedURLs();
 
 		//current page number for nextPageType = pagenation
 		assertExists<number>(this.site.startingPageNumber);
@@ -69,8 +69,6 @@ export default class Scraper {
 		//Exported count
 		this.exportedCnt = 0;
 	}
-
-
 
 	getSiteURLs(): void {
 		/** Configure UserAgent */
@@ -108,9 +106,7 @@ export default class Scraper {
 			});
 	}
 
-
 	getLastURL(dom: Document | Element): string | null {
-
 		assertExists<string>(this.site.lastUrlSelector);
 
 		const lastElem = dom.querySelector(this.site.lastUrlSelector);
@@ -120,10 +116,8 @@ export default class Scraper {
 	}
 
 	getPageURLfromIndex(): void {
-
 		if (this.siteURLs.length === 0) return;
 		const indexURL = this.siteURLs.shift();
-
 
 		if (!indexURL) {
 			this.logError(indexURL as string, this.getPageURLfromIndex.name, "Invalid URL", "");
@@ -155,8 +149,8 @@ export default class Scraper {
 					const pageURL = /^https/.test(link) ? link : this.site.rootUrl + link;
 
 					/** Exit if the url already exist in exportedArticles. */
-					if (this.exportedArticles.length > 0 && this.exportedArticles.find((obj) => obj.url === pageURL)) {
-						console.log(`${link} already exists.`);
+					if (this.scrapedURLs.length > 0 && this.scrapedURLs.includes(pageURL)) {
+						console.log(`${pageURL} already exists.`);
 						exportedCnt++;
 						continue;
 					}
@@ -169,9 +163,7 @@ export default class Scraper {
 
 					this.pageURLs.push(pageURL);
 					this.scrapeArticle();
-
 				}
-
 
 				if (indexBlocks.length === exportedCnt) {
 					/** Exit if all links found on index pages are already being exported */
@@ -181,30 +173,11 @@ export default class Scraper {
 				}
 
 				if (this.siteURLs.length > 0) this.getPageURLfromIndex();
-
 			})
 			.catch((err) => this.logError(indexURL, this.getPageURLfromIndex.name, "JSDOM error", err));
 	}
 
-	isTagIncluded(url: string, el: Element, selector: string): boolean {
-
-		if (!(el instanceof Element) || typeof selector !== 'string') {
-			this.logError(url, this.isTagIncluded.name, `Invalid args. el:${el}, selector:${selector}`, "");
-			return false;
-		}
-
-		const tagsOnPage = this.getTags(el, selector);
-		if (!tagsOnPage) {
-			this.logError(url, this.isTagIncluded.name, `getTags returned ${tagsOnPage}`, "");
-			return false;
-		}
-
-		return vldt.isCommonValue(tagsOnPage, this.site.tags) ? true : false;
-	}
-
-
 	scrapeArticle(): void {
-
 		if (!this.pageURLs && !this.siteURLs) {
 			this.close();
 		}
@@ -236,30 +209,41 @@ export default class Scraper {
 			.catch((err) => this.logError(url, this.scrapeArticle.name, "JSDOM failed", err));
 	}
 
-
-
-	getExportedArticles(): exportedArticles[] {
+	getScrapedURLs(): void {
 		try {
-			return fs
+			const urls = fs
 				.readdirSync(this.site.saveDir, { withFileTypes: true, encoding: "utf-8" })
-				.filter((dirent) => dirent.isFile() && dirent.name.endsWith(".txt"))
+				.filter((dirent) => dirent.isFile() && dirent.name.endsWith(".txt") && dirent.name.includes(this.site.name))
 				.map((dirent) => {
 					const file = fs.readFileSync(path.join(this.site.saveDir, dirent.name), {
 						encoding: "utf-8",
 					});
-					return JSON.parse(file);
-				})
-				.filter((obj) => obj.name === this.site.name)
-				.map((article) => {
-					return { name: article.name, id: article.id, url: article.url };
+					const parseJSON = JSON.parse(file);
+					return parseJSON.url;
 				});
+			if (urls.length > 0) this.scrapedURLs.push(...urls);
 		} catch (err) {
 			throw new Error(`Failed to read files from ${this.site.saveDir}.ERROR: ${err}`);
 		}
 	}
 
-	getTags(doc: Element | Document, selector: string): string[] {
-		const elements = doc.querySelectorAll(selector);
+	isTagIncluded(url: string, el: Element, selector: string): boolean {
+		if (!(el instanceof Element) || typeof selector !== "string") {
+			this.logError(url, this.isTagIncluded.name, `Invalid args. el:${el}, selector:${selector}`, "");
+			return false;
+		}
+
+		const tagsOnPage = this.getTags(el, selector);
+		if (!tagsOnPage) {
+			this.logError(url, this.isTagIncluded.name, `getTags returned ${tagsOnPage}`, "");
+			return false;
+		}
+
+		return vldt.isCommonValue(tagsOnPage, this.site.tags) ? true : false;
+	}
+
+	getTags(dom: Element | Document, selector: string): string[] {
+		const elements = dom.querySelectorAll(selector);
 
 		if (elements.length === 0) return [];
 
@@ -276,7 +260,6 @@ export default class Scraper {
 		return vldt.isCommonValue<string[]>(this.site.tags, tags);
 	}
 
-
 	extractLink(el: Element): string {
 		const href = el.getAttribute("href");
 
@@ -286,8 +269,6 @@ export default class Scraper {
 
 		return /^https/.test(href) ? href : this.site.rootUrl + href;
 	}
-
-
 
 	returnArticles(): articles[] {
 		return this.acquiredArticles;
@@ -308,6 +289,7 @@ export default class Scraper {
 			if (!exists<string>(title)) reject(msg);
 
 			const bodyElem = dom.querySelector(this.site.articleBodySelector);
+			.
 			if (!bodyElem) reject(msg);
 
 			const body = (bodyElem as Element).textContent;
@@ -381,7 +363,6 @@ export default class Scraper {
 				console.log(this.errors);
 			}
 		});
-
 	}
 
 	logError(url: string, method: string, msg: string, err: string): void {
@@ -390,10 +371,13 @@ export default class Scraper {
 	}
 
 	getDate(): string {
-		return new Date().toLocaleDateString("ja-JP", {
-			year: "numeric", month: "2-digit",
-			day: "2-digit"
-		}).replaceAll('/', "");
+		return new Date()
+			.toLocaleDateString("ja-JP", {
+				year: "numeric",
+				month: "2-digit",
+				day: "2-digit",
+			})
+			.replaceAll("/", "");
 	}
 
 	getTime(): string {
@@ -401,7 +385,9 @@ export default class Scraper {
 	}
 
 	close(): void {
-		console.log(`Completed scraping site: ${this.site.name}.  Success:${this.exportedCnt} Errors:${this.errors.length}`);
+		console.log(
+			`Completed scraping site: ${this.site.name}.  Success:${this.exportedCnt} Errors:${this.errors.length}`,
+		);
 		if (this.errors.length > 0) this.appendErrorLog();
 		return;
 	}
