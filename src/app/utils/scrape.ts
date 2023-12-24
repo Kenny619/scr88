@@ -221,9 +221,9 @@ export default class Scraper {
 					const parseJSON = JSON.parse(file);
 					return parseJSON.url;
 				});
-			if (urls.length > 0) this.scrapedURLs.push(...urls);
+			if (urls.length > 0) this.scrapedURLs = [...urls];
 		} catch (err) {
-			throw new Error(`Failed to read files from ${this.site.saveDir}.ERROR: ${err}`);
+			throw new Error(`Failed to read files from ${this.site.saveDir}\nERROR: ${err}`);
 		}
 	}
 
@@ -289,7 +289,6 @@ export default class Scraper {
 			if (!exists<string>(title)) reject(msg);
 
 			const bodyElem = dom.querySelector(this.site.articleBodySelector);
-			.
 			if (!bodyElem) reject(msg);
 
 			const body = (bodyElem as Element).textContent;

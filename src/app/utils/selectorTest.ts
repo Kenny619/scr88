@@ -1,7 +1,7 @@
-import { site } from "../../typings/index.js";
-import * as vldt from "./validator.js";
 import { JSDOM, ResourceLoader } from "jsdom";
+import { site } from "../../typings/index.js";
 import userAgent from "./userAgents.js";
+//import * as vldt from "./validator.js";
 
 /*
 Selectors to be tested
@@ -15,170 +15,161 @@ nextPageUrlRegExp
 ✅indexLinkBlockSelector
 ✅indexLinkSelector
 
-articleTagSelector
-articleBlockSelector
+✅articleTagSelector
+✅articleBlockSelector
 
-articleTitleSelector
-articleBodySelector
+✅articleTitleSelector
+✅articleBodySelector
 
 */
-export default function validateSelectors(site: site): string[] {
-	//Stores error message
-	const errorMsgs: string[] = [];
-	let testResults: site;
 
-	const loader = new ResourceLoader({
-		userAgent: userAgent(),
-	});
+type extractTypes = "link" | "text";
 
-	JSDOM.fromURL(site.entryUrl, { resources: loader })
-		.then((jd) => {
-			const dom = jd.window.document;
-		})
-		.catch((err) => {
-			errorMsgs.push(`Failed JSDOM on ${site.entryUrl}. ${err}`);
-		});
 
-	return errorMsgs;
+type result = {
+	pass: boolean;
+	returned: string | Element | NodeList;
+};
+interface Selectors {
+	lastUrlSelector: result;
+	lastPageNumberRegExp: result;
 
-	function __index(dom: Document | Element): boolean {
-		const indexBlocks = dom.querySelectorAll(site.indexLinkBlockSelector as string);
-		if (!indexBlocks) {
-			errorMsgs.push(`indexLinkBlockSelector: ${site.indexLinkBlockSelector as string} did not return valid NodeList.`);
-			return false;
+	nextPageLinkSelector: result;
+	nextPageUrlRegExp: result;
+
+	indexTagSelector: result;
+	indexLinkBlockSelector: result;
+	indexLinkSelector: result;
+
+	articleTagSelector: result;
+	articleBlockSelector: result;
+
+	articleTitleSelector: result;
+	articleBodySelector: result;
+}
+
+
+export default async function validateSelectors(site: site): Promise<object> {
+
+	const testResults = <Selectors>{};
+
+	const indexDom = await getDom(site.entryUrl);
+
+	if (site.nextPageType === "last" && site.lastUrlSelector) {
+		extract("link", indexDom, "lastUrlSelector");
+
+		if (testResults.lastUrlSelector.pass && site.lastPageNumberRegExp) {
+			const res = <result>{};
+			const regexp = new RegExp(site.lastPageNumberRegExp);
+			const matched = (testResults.lastUrlSelector.returned as string).match(regexp);
+			res.pass = matched && Number(matched[1]) ? true : false;
+			res.returned = matched && Number(matched[1]) ? matched[1] : "RegExp returned null";
+			testResults.lastPageNumberRegExp = res;
 		}
+	}
 
-		testResults.indexLinkBlockSelector = `${indexBlocks.length} links`;
+	if (site.indexLinkBlockSelector) {
+		selectorAll(indexDom, "indexLinkBlockSelector");
 
-		for (const block of indexBlocks) {
-			const linkElem = block.querySelector(site.indexLinkSelector as string);
-			if (!linkElem) {
-				errorMsgs.push(`indexLinkSelector: ${site.indexLinkSelector as string} did not return valid Element.`);
-				return false;
-			}
-			const link = linkElem.getAttribute("href");
-			if (!link) {
-				errorMsgs.push(`indexLinkSelector: ${site.indexLinkSelector as string} did not return valid url.`);
-				return false;
-			}
-			testResults.indexLinkSelector = link;
-		}
+		if (testResults.indexLinkBlockSelector.pass) {
+			const linkElem = (testResults.indexLinkBlockSelector.returned as NodeList).item(0);
 
-		if (site.indexTagSelector) {
-			const tagElems = dom.querySelectorAll(site.indexTagSelector);
+			extract("link", linkElem as Element, "indexLinkSelector");
 
-			if (tagElems.length === 0) {
-				errorMsgs.push(`indexTagSelector: ${site.indexTagSelector as string} did not return valid url.`);
-				return false;
-			}
-
-			for (const el of tagElems) {
-				if (!el.textContent) {
-					errorMsgs.push(`indexTagSelector: ${site.indexTagSelector as string} did not return valid tag.`);
-					return false;
+			if (site.indexTagSelector) {
+				selectorAll(linkElem as Element, "indexTagSelector");
+				if (testResults.indexTagSelector.pass) {
+					const indexTagElem = (testResults.indexTagSelector.returned as NodeList).item(0);
+					if (indexTagElem && typeof indexTagElem.textContent === "string")
+						testResults.indexTagSelector.returned = indexTagElem.textContent;
 				}
-
-				testResults.indexTagSelector = el.textContent;
 			}
+		} else {
+			throw testResults;
 		}
-
-		return true;
 	}
 
-	function __lastUrlSelector(dom: Document | Element): boolean {
-		const lastElem = dom.querySelector(site.lastUrlSelector as string);
-		if (!lastElem) {
-			errorMsgs.push(`lastUrlSelector: ${site.lastUrlSelector as string} did not return valid Element.`);
-			return false;
-		}
-		const url = lastElem.getAttribute("href");
-		if (!url) {
-			errorMsgs.push(`lastUrlSelector: ${site.lastUrlSelector as string} failed to get url from ${lastElem}.`);
-			return false;
-		}
+	//article test
+	const articleUrl = site.siteType === "links" ? testResults.indexLinkSelector.returned : site.entryUrl;
+	let articleDom: (Document | Element) = await getDom(articleUrl as string);
 
-		testResults.lastUrlSelector = url;
-
-		const lpnRegExp = new RegExp(site.lastPageNumberRegExp as string);
-		const lpNumber = url.match(lpnRegExp);
-		if (!lpNumber) {
-			errorMsgs.push(`lastPageNumberRegExp: ${site.lastPageNumberRegExp as string} did not match page number.`);
-			return false;
-		}
-
-		if (typeof lpNumber[1] !== "string" && Number(lpNumber[1]) > 0) {
-			errorMsgs.push(`lastPageNumberRegExp: ${site.lastPageNumberRegExp as string} did not return valid page number.`);
-			return false;
-		}
-
-		testResults.lastPageNumberRegExp = lpNumber[1];
-
-		return true;
+	if (site.articleBlockSelector) {
+		selectorAll(articleDom, "articleBlockSelector");
+		if (!testResults.articleBlockSelector.pass) throw testResults;
+		articleDom = (testResults.articleBlockSelector.returned as NodeList)[0] as Element;
 	}
 
-	function _article(url: string): boolean {
+	extract("text", articleDom, "articleTitleSelector");
+	extract("text", articleDom, "articleBodySelector");
+
+	if (site.articleTagSelector) {
+		selectorAll(articleDom, "articleTagSelector");
+		if (testResults.articleTagSelector.pass) {
+			const articleTagElem = (testResults.articleTagSelector.returned as NodeList).item(0);
+			if (articleTagElem && typeof articleTagElem.textContent === "string")
+				testResults.articleTagSelector.returned = articleTagElem.textContent;
+		}
+	}
+
+	return testResults;
+
+
+	async function getDom(url: string) {
+		let dom: Document;
+
 		const loader = new ResourceLoader({
 			userAgent: userAgent(),
 		});
 
-		JSDOM.fromURL(url, { resources: loader })
-			.then((jd) => {
-				const dom = jd.window.document;
+		try {
+			const jd = await JSDOM.fromURL(url, { resources: loader });
+			dom = jd.window.document;
+		} catch (err) {
+			throw new Error(`JSDOM failed on ${site.entryUrl}\n ${err}`);
+		}
+		return dom;
 
-				if (site.articleBlockSelector) {
-					//articleBlockSelector test
-					const articleBlockElem = dom.querySelectorAll(site.articleBlockSelector);
-					if (articleBlockElem.length === 0) {
-						errorMsgs.push(
-							`articleBlockSelector: ${site.articleBlockSelector as string} failed to get article blocks from ${url}.`,
-						);
-						return false;
-					}
-					testResults.articleBlockSelector = String(articleBlockElem[0]);
-				}
-
-				//articleTitleSelector test
-				const articleTitleElem = dom.querySelector(site.articleTitleSelector);
-				if (!articleTitleElem) {
-					errorMsgs.push(
-						`articleTitleSelector: ${site.articleTitleSelector as string} failed to get title element from ${url}.`,
-					);
-					return false;
-				}
-
-				const title = articleTitleElem.childNodes[0].nodeValue;
-				if (!title) {
-					errorMsgs.push(
-						`articleTitleSelector: ${site.articleTitleSelector as string} failed to get title string from ${url}.`,
-					);
-					return false;
-				}
-
-				testResults.articleTitleSelector;
-
-				//articleBodySelector test
-				const articleBodyElem = dom.querySelector(site.articleBodySelector);
-				if (!articleBodyElem) {
-					errorMsgs.push(
-						`articleBodySelector: ${site.articleBodySelector as string} failed to get body element from ${url}.`,
-					);
-					return false;
-				}
-
-				const body = articleBodyElem.textContent;
-				if (!body) {
-					errorMsgs.push(
-						`articleBodySelector: ${site.articleBodySelector as string} failed to get body string from ${url}.`,
-					);
-					return false;
-				}
-
-				testResults.articleBodySelector = body;
-
-				//articleTagSelector testa
-			})
-			.catch((err) => {
-				errorMsgs.push(`Failed JSDOM on an article URL ${url}. ${err}`);
-			});
 	}
+
+	function extract(type: extractTypes, elem: Element | Document, selectorName: string): void {
+
+
+		const selector = getSelector(site, selectorName);
+		const res = <result>{};
+
+		const el = elem.querySelector(selector);
+		res.pass = el ? true : false;
+		res.returned = el
+			? type === "link"
+				? el.getAttribute("href") as string
+				: el.textContent as string
+			: `${selector} failed to extract ${type}.`;
+
+		testResults[selectorName as keyof typeof testResults] = res;
+
+	}
+
+	function selectorAll(elem: Document | Element, selectorName: string): void {
+
+		const selector = getSelector(site, selectorName);
+		const nList = elem.querySelectorAll(selector as string);
+		const res = <result>{};
+
+		res.pass = nList.length > 0 ? true : false;
+		res.returned = nList.length > 0 ? nList : `${selector} failed to extract valid nodeLists.`;
+		testResults[selectorName as keyof typeof testResults] = res;
+	}
+
+	function getSelector(site: site, selectorName: string): string {
+
+		const selector = site[selectorName as keyof typeof site] as string;
+
+		if (selector && typeof selector === 'string') {
+			return selector;
+		}
+
+		throw new Error(`selectorName ${selectorName} not found in site\n site=${site}`);
+
+	}
+
 }
