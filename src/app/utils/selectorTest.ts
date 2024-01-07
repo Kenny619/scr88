@@ -1,7 +1,6 @@
 import { JSDOM, ResourceLoader } from "jsdom";
 import { site } from "../../typings/index.js";
 import userAgent from "./userAgents.js";
-//import * as vldt from "./validator.js";
 
 /*
 Selectors to be tested
@@ -138,14 +137,14 @@ export default async function validateSelectors(site: site): Promise<object> {
 		const res = <result>{};
 
 		const el = elem.querySelector(selector);
-		res.pass = el ? true : false;
-		res.returned = el
-			? type === "link"
-				? el.getAttribute("href") as string
-				: el.textContent as string
-			: `${selector} failed to extract ${type}.`;
-
-		testResults[selectorName as keyof typeof testResults] = res;
+		if (el) {
+			const extracted = type === "link" ? el.getAttribute("href") : el.textContent;
+			res.returned = extracted ? extracted : `${selector} failed to extract ${type}.`;
+			res.pass = res.returned === extracted ? true : false;
+		} else {
+			res.pass = false;
+			res.returned = `querySelector failed on selector ${selector}`;
+		}
 
 	}
 
@@ -169,6 +168,10 @@ export default async function validateSelectors(site: site): Promise<object> {
 		}
 
 		throw new Error(`selectorName ${selectorName} not found in site\n site=${site}`);
+
+	}
+
+	function outputResult(site: site, testResult: Selectors) {
 
 	}
 
