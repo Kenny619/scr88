@@ -27,7 +27,7 @@ type extractTypes = "link" | "text";
 
 type result = {
 	pass: boolean;
-	returned: string | Element | NodeList;
+	returned: string | Element | Node;
 };
 interface Selectors {
 	lastUrlSelector: result;
@@ -71,16 +71,15 @@ export default async function validateSelectors(site: site): Promise<object> {
 		selectorAll(indexDom, "indexLinkBlockSelector");
 
 		if (testResults.indexLinkBlockSelector.pass) {
-			const linkElem = (testResults.indexLinkBlockSelector.returned as NodeList).item(0);
+			const linkElem = testResults.indexLinkBlockSelector.returned;
 
-			extract("link", linkElem as Element, "indexLinkSelector");
+			extract("link", linkElem, "indexLinkSelector");
 
 			if (site.indexTagSelector) {
-				selectorAll(linkElem as Element, "indexTagSelector");
-				if (testResults.indexTagSelector.pass) {
-					const indexTagElem = (testResults.indexTagSelector.returned as NodeList).item(0);
-					if (indexTagElem && typeof indexTagElem.textContent === "string")
-						testResults.indexTagSelector.returned = indexTagElem.textContent;
+				selectorAll(linkElem, "indexTagSelector");
+				if (testResults.indexTagSelector.pass && testResults.indexTagSelector.returned instanceof Element) {
+					testResults.indexTagSelector.returned = testResults.indexTagSelector.returned.textContent;
+
 				}
 			}
 		} else {
@@ -90,12 +89,15 @@ export default async function validateSelectors(site: site): Promise<object> {
 
 	//article test
 	const articleUrl = site.siteType === "links" ? testResults.indexLinkSelector.returned : site.entryUrl;
-	let articleDom: (Document | Element) = await getDom(articleUrl as string);
+	let articleDom: Document | Element = await getDom(articleUrl);
 
 	if (site.articleBlockSelector) {
 		selectorAll(articleDom, "articleBlockSelector");
-		if (!testResults.articleBlockSelector.pass) throw testResults;
-		articleDom = (testResults.articleBlockSelector.returned as NodeList)[0] as Element;
+		if (testResults.articleBlockSelector.returned instanceof Element) {
+			articleDom = testResults.articleBlockSelector.returned;
+		} else {
+			throw testResults;
+		}
 	}
 
 	extract("text", articleDom, "articleTitleSelector");
@@ -103,17 +105,23 @@ export default async function validateSelectors(site: site): Promise<object> {
 
 	if (site.articleTagSelector) {
 		selectorAll(articleDom, "articleTagSelector");
-		if (testResults.articleTagSelector.pass) {
-			const articleTagElem = (testResults.articleTagSelector.returned as NodeList).item(0);
-			if (articleTagElem && typeof articleTagElem.textContent === "string")
-				testResults.articleTagSelector.returned = articleTagElem.textContent;
+		if (testResults.articleTagSelector.pass && testResults.articleBlockSelector.returned instanceof Element) {
+			const text = testResults.articleBlockSelector.returned.textContent;
+			if (text) {
+				testResults.articleBlockSelector.returned = text;
+				testResults.articleBlockSelector.pass = true;
+			} else {
+
+				testResults.articleBlockSelector.returned = "Failed to get textContent from querySelectorAll result.";
+				testResults.articleBlockSelector.pass = true;
+			}
 		}
 	}
 
 	return testResults;
 
 
-	async function getDom(url: string) {
+	async function getDom(url: string): Promise<Document> {
 		let dom: Document;
 
 		const loader = new ResourceLoader({
@@ -151,17 +159,17 @@ export default async function validateSelectors(site: site): Promise<object> {
 	function selectorAll(elem: Document | Element, selectorName: string): void {
 
 		const selector = getSelector(site, selectorName);
-		const nList = elem.querySelectorAll(selector as string);
+		const nList = elem.querySelectorAll(selector);
 		const res = <result>{};
 
-		res.pass = nList.length > 0 ? true : false;
-		res.returned = nList.length > 0 ? nList : `${selector} failed to extract valid nodeLists.`;
+		res.returned = nList.length > 0 ? nList.item(0) : `${selector} failed to extract valid nodeLists.`;
+		res.pass = typeof res.returned !== 'string' ? true : false;
 		testResults[selectorName as keyof typeof testResults] = res;
 	}
 
 	function getSelector(site: site, selectorName: string): string {
 
-		const selector = site[selectorName as keyof typeof site] as string;
+		const selector = site[selectorName as keyof typeof site];
 
 		if (selector && typeof selector === 'string') {
 			return selector;
@@ -170,9 +178,9 @@ export default async function validateSelectors(site: site): Promise<object> {
 		throw new Error(`selectorName ${selectorName} not found in site\n site=${site}`);
 
 	}
+	/**
+		function outputResult(site: site, testResult: Selectors) {
 
-	function outputResult(site: site, testResult: Selectors) {
-
-	}
-
+		}
+	*/
 }
