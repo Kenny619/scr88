@@ -23,6 +23,11 @@ export interface site {
 	siteType: "links" | "multipleArticle" | "singleArticle";
 
 	//How to transition to the next page
+	//parameter = creates next page URL by manipulating the page number parameter in the URL
+	//url = creates next page URL by manipulating the page number in the URL
+	//pagenation = finds the next page link from the pagenation link
+	//next = finds the next page link from the next link
+	//last = extract the last page number URL from pagenation and creates the list of all page URLs of the site
 	nextPageType: "parameter" | "pagenation" | "next" | "url" | "last";
 
 	//If nextPageType = "last" | CSS selector for getting the last page url
