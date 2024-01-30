@@ -1,7 +1,7 @@
 import { JSDOM, ResourceLoader } from "jsdom";
 import { site } from "../../typings/index.js";
+import validateSiteInputs from "./srcWebsiteValidation.js";
 import userAgent from "./userAgents.js";
-
 /*
 Selectors to be tested
 lastUrlSelector
@@ -13,7 +13,7 @@ nextPageUrlRegExp
 indexLinkBlockSelector
   indexTagSelector
   indexLinkSelector
-  
+
   articleBlockSelector
 	  articleTagSelector
 	  articleTitleSelector
@@ -29,29 +29,29 @@ type extractTypes = "link" | "text";
 
 type resultSingle =
 	| {
-			pass: true;
-			returned: string;
-	  }
+		pass: true;
+		returned: string;
+	}
 	| {
-			pass: false;
-			error: string;
-	  };
+		pass: false;
+		error: string;
+	};
 
 type resultAll =
 	| {
-			pass: true;
-			returned: Element;
-	  }
+		pass: true;
+		returned: Element;
+	}
 	| {
-			pass: false;
-			error: string;
-	  };
+		pass: false;
+		error: string;
+	};
 
 type testResult<T> = {
 	[K in keyof T]: resultSingle | resultAll;
 };
 
-type selectors = Pick<
+type selectors = Partial<Pick<
 	site,
 	| "lastUrlSelector"
 	| "lastPageNumberRegExp"
@@ -65,36 +65,28 @@ type selectors = Pick<
 	| "articleBlockSelector"
 	| "articleTitleSelector"
 	| "articleBodySelector"
->;
+>>;
 
-/*
-interface Selectors {
-lastUrlSelector: result;
-	lastPageNumberRegExp: result;
 
-	nextPageLinkSelector: result;
-	nextPageUrlRegExp: result;
-
-	indexTagSelector: result;
-	indexLinkBlockSelector: result;
-	indexLinkSelector: result;
-
-	articleTagSelector: result;
-	articleBlockSelector: result;
-
-	articleTitleSelector: result;
-	articleBodySelector: result;
-}
-*/
 
 export default async function validateSelectors(site: site): Promise<testResult<selectors>> {
+
+
+	const valResult = validateSiteInputs(site);
+	if (valResult.length > 0) throw new Error(valResult.join("\r\n"));
+
+
 	const testResults = <testResult<selectors>>{};
 
 	const indexDom = await getDom(site.entryUrl);
 
+
+
 	if (site.nextPageType === "last") {
+
 		testResults.lastUrlSelector = extract("link", indexDom, "lastUrlSelector");
-		if (testResults.lastUrlSelector.pass && site.lastPageNumberRegExp) {
+
+		if (testResults.lastUrlSelector.pass) {
 			const regexp = new RegExp(site.lastPageNumberRegExp);
 			const matched = testResults.lastUrlSelector.returned.match(regexp);
 			if (matched) {
@@ -105,14 +97,7 @@ export default async function validateSelectors(site: site): Promise<testResult<
 			} else {
 				testResults.lastPageNumberRegExp = {
 					pass: false,
-					error: "RegExp returned null",
-				};
-			}
-		} else {
-			if (!site.lastPageNumberRegExp) {
-				testResults.lastPageNumberRegExp = {
-					pass: false,
-					error: "Missing lastPageNumberRegExp",
+					error: `RegExp, '${site.lastPageNumberRegExp}' found no match against ${testResults.lastUrlSelector.returned}`
 				};
 			}
 		}
@@ -122,53 +107,61 @@ export default async function validateSelectors(site: site): Promise<testResult<
 		testResults.nextPageLinkSelector = extract("link", indexDom, "nextPageLinkSelector");
 	}
 
-	function nextUrl(
-		type: Omit<site["nextPageType"], "last" | "next" | "pagenation">,
-		selectorName: keyof Pick<selectors, "nextPageUrlRegExp" | "nextPageParameter">,
-	) {
-		//actions for url and parameter could be quite different.  It'd be safe to write out parameter logic first.
-	}
 	if (site.nextPageType === "parameter") {
-		//action
+
+		const url = new URL(site.entryUrl);
+		if (url.searchParams.has(site.nextPageParameter)) {
+			let cPageNum = Number(url.searchParams.get(site.nextPageParameter));
+			cPageNum++;
+			url.searchParams.set(site.nextPageParameter, String(cPageNum));
+			const dom = await getDom(url.href);
+
+			testResults.nextPageParameter = dom ? {
+				pass: true,
+				returned: url.href
+			} : {
+				pass: false,
+				error: `Failed to acquire DOM from next URL ${url.href}.  Next page parameter was changed to ${cPageNum} from its original URL of ${site.entryUrl}`
+			}
+
+		} else {
+			testResults.nextPageParameter = {
+				pass: false,
+				error: `Could not find nextPageParameter ${site.nextPageParameter} from the url ${site.entryUrl}`
+			}
+		}
+
 	}
+
+
 	if (site.nextPageType === "url") {
-		if (site.nextPageUrlRegExp) {
-			const regexp = new RegExp(site.nextPageUrlRegExp);
-			const matched = site.entryUrl.match(regexp);
-			if (matched) {
-				let cPageNumber = Number(matched[1]);
-				cPageNumber++;
-				const nextPageUrl = site.entryUrl.replace(regexp, cPageNumber.toString());
-				const nextPageDOM = await getDom(nextPageUrl);
-				if (nextPageDOM) {
-					testResults.nextPageUrlRegExp = {
-						pass: true,
-						returned: nextPageUrl,
-					};
-				} else {
-					testResults.nextPageUrlRegExp = {
-						pass: false,
-						error: `Invalid URL ${nextPageUrl}`,
-					};
-				}
+		const regexp = new RegExp(site.nextPageUrlRegExp);
+		const matched = site.entryUrl.match(regexp);
+		if (matched) {
+			let cPageNumber = Number(matched[1]);
+			cPageNumber++;
+			const nextPageUrl = site.entryUrl.replace(regexp, cPageNumber.toString());
+			const nextPageDOM = await getDom(nextPageUrl);
+			if (nextPageDOM) {
+				testResults.nextPageUrlRegExp = {
+					pass: true,
+					returned: nextPageUrl,
+				};
 			} else {
 				testResults.nextPageUrlRegExp = {
 					pass: false,
-					error: `Invalid regexp ${regexp}.  No match over ${site.entryUrl}`,
+					error: `Invalid URL ${nextPageUrl}.  Unable to obtain DOM.`,
 				};
 			}
 		} else {
 			testResults.nextPageUrlRegExp = {
 				pass: false,
-				error: "Missing nextPageUrlRegExp",
+				error: `Invalid regexp ${regexp}.  No match over ${site.entryUrl}`,
 			};
 		}
-
-		testResults.nextPageUrlRegExp = {
-			pass: false,
-			error: "nextPageUrlRegExp is required when nextPageType is set to 'url'.",
-		};
 	}
+
+
 	if (site.indexLinkBlockSelector) {
 		testResults.indexLinkBlockSelector = extractAll(indexDom, "indexLinkBlockSelector");
 

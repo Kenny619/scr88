@@ -51,8 +51,8 @@ export default class Scraper {
 		this.getScrapedURLs();
 
 		//current page number for nextPageType = pagenation
-		assertExists<number>(this.site.startingPageNumber);
-		this.currentPageNumber = this.site.startingPageNumber;
+		if (Object.hasOwn(this.site, "startingPageNumber"))
+			this.currentPageNumber = this.site.startingPageNumber;
 
 		// list of URLs to be scraped.  Only used when nextUrlType = last
 		this.siteURLs = [this.site.entryUrl];
