@@ -8,3 +8,11 @@ validateSelectors(enigma)
 		console.debug(res);
 	})
 	.catch((res) => console.log(res));
+
+const genArray = Array(10)
+	.fill(0)
+	.map((_, i) => i + 1);
+const genNumber = ()
+genArray.forEach((i) => {
+	console.log(i);
+}

@@ -27,6 +27,8 @@
 		"dotenv": "^16.3.1",
 		"event": "^1.0.0",
 		"fs": "^0.0.1-security",
+		"http": "^0.0.1-security",
+		"https": "^1.0.0",
 		"jsdom": "^23.0.1",
 		"vite-tsconfig-paths": "^4.2.2"
 	},

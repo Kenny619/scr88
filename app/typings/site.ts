@@ -1,3 +1,6 @@
+export type languages = "JP" | "EN";
+export type siteTypes = "links" | "multipleArticle" | "singleArticle";
+export type nextPageTypes = "parameter" | "pagenation" | "next" | "url" | "last";
 export interface site {
 	/** required ------------------------------------- */
 
@@ -14,13 +17,13 @@ export interface site {
 	saveDir: string;
 
 	//Log output dir path
-	logDir: string;
+	//	logDir: string;
 
 	//Language of the source site.  Output file
-	language: "JP" | "EN";
+	language: languages;
 
 	//Source site type.
-	siteType: "links" | "multipleArticle" | "singleArticle";
+	siteType: siteTypes;
 
 	//How to transition to the next page
 	//parameter = creates next page URL by manipulating the page number parameter in the URL
@@ -28,7 +31,7 @@ export interface site {
 	//pagenation = finds the next page link from the pagenation link
 	//next = finds the next page link from the next link
 	//last = extract the last page number URL from pagenation and creates the list of all page URLs of the site
-	nextPageType: "parameter" | "pagenation" | "next" | "url" | "last";
+	nextPageType: nextPageTypes;
 
 	//If nextPageType = "last" | CSS selector for getting the last page url
 	lastUrlSelector?: string;
@@ -68,7 +71,7 @@ export interface site {
 	tags?: string[];
 
 	//if tagFiltering is true. | CSS selector for the tags on index page
-	indexTagSelector?: string;
+	//indexTagSelector?: string;
 
 	//if tagFiltering is true OR tagCollection is true | CSS selector for the tags
 	articleTagSelector?: string;
@@ -76,7 +79,7 @@ export interface site {
 	/** optional: siteType parameters ----------------------------- */
 
 	//CSS selector for capturing link block on index page
-	indexLinkBlockSelector?: string;
+	//indexLinkBlockSelector?: string;
 
 	//CSS selector for capturing link to the article page
 	indexLinkSelector?: string;
