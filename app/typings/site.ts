@@ -13,9 +13,6 @@ export interface site {
 	//Output dir path
 	saveDir: string;
 
-	//Log output dir path
-	logDir: string;
-
 	//Language of the source site.  Output file
 	language: "JP" | "EN";
 
