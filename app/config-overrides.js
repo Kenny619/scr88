@@ -1,5 +1,5 @@
-const webpack = require("webpack");
-module.exports = function override(config) {
+import webpack from "webpack";
+export function override(config) {
 	const fallback = config.resolve.fallback || {};
 	Object.assign(fallback, {
 		fs: false,
@@ -24,4 +24,4 @@ module.exports = function override(config) {
 		}),
 	]);
 	return config;
-};
+}

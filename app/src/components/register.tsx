@@ -1,12 +1,23 @@
 import React, { useState, createContext, useContext } from "react";
-import { Flex, Text, RadioGroup, Table, TextField, Badge } from "@radix-ui/themes";
-import * as Checkbox from "@radix-ui/react-checkbox";
+import { Flex, Text, RadioGroup, Table, TextField, Badge, Switch } from "@radix-ui/themes";
+//import * as Switch from "@radix-ui/react-switch";
 import { CheckIcon } from "@radix-ui/react-icons";
-import { site } from "../../typings/index";
-import validateInput from "../utils/validateInputs";
-type Obj = { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean };
+import type { site } from "../../typings/index";
+import validateInput from "../utils/validator";
+type Obj = { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean | undefined };
 type Inputs = Obj[];
 
+type inputKeys = Exclude<
+	Partial<keyof site>,
+	| "language"
+	| "nextPageType"
+	| "siteType"
+	| "tagCollect"
+	| "tagFiltering"
+	| "tags"
+	| "indexTagSelector"
+	| "indexLinkBlockSelector"
+>;
 type inputValues = {
 	value?: string | boolean;
 	errorMsg?: string;
@@ -15,13 +26,20 @@ type inputValues = {
 //input field values
 
 const inputs: Inputs = [
-	{ siteKey: "name", label: "Site name", inputMethod: "text", value: "", badgeStatus: "Pending Input", errorMsg: "" },
+	{
+		siteKey: "name",
+		label: "Site name",
+		inputMethod: "text",
+		value: undefined,
+		badgeStatus: "Pending Input",
+		errorMsg: "",
+	},
 
 	{
 		siteKey: "rootUrl",
 		label: "Target site FQDN",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -29,15 +47,7 @@ const inputs: Inputs = [
 		siteKey: "entryUrl",
 		label: "Entry point URL",
 		inputMethod: "text",
-		value: "",
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "saveDir",
-		label: "output Dir",
-		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -45,25 +55,33 @@ const inputs: Inputs = [
 		siteKey: "language",
 		label: "languages",
 		inputMethod: ["JP", "EN"],
-		value: "",
+		value: undefined,
+	},
+	{
+		siteKey: "saveDir",
+		label: "output Dir",
+		inputMethod: "text",
+		value: undefined,
+		badgeStatus: "Pending Input",
+		errorMsg: "",
 	},
 	{
 		siteKey: "siteType",
 		label: "site type",
 		inputMethod: ["link", "singleArticle", "multipleArticle"],
-		value: "",
+		value: undefined,
 	},
 	{
 		siteKey: "nextPageType",
 		label: "next page type",
 		inputMethod: ["last", "next", "parameter", "url"],
-		value: "",
+		value: undefined,
 	},
 	{
 		siteKey: "lastUrlSelector",
 		label: "CSS link selector of last URL",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -71,7 +89,7 @@ const inputs: Inputs = [
 		siteKey: "lastPageNumberRegExp",
 		label: "last URL pageNumber RegExp",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -79,7 +97,7 @@ const inputs: Inputs = [
 		siteKey: "nextPageParameter",
 		label: "pageNumber URL parameter",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -87,7 +105,7 @@ const inputs: Inputs = [
 		siteKey: "nextPageLinkSelector",
 		label: "CSS link selector of next URL",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -95,7 +113,7 @@ const inputs: Inputs = [
 		siteKey: "nextPageUrlRegExp",
 		label: "in-URL pageNumber RegExp",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -103,7 +121,7 @@ const inputs: Inputs = [
 		siteKey: "startingPageNumber",
 		label: "Starting page number (if not 1)",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -123,7 +141,7 @@ const inputs: Inputs = [
 		siteKey: "tags",
 		label: "Input comma separated tags for filtering use",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -131,7 +149,7 @@ const inputs: Inputs = [
 		siteKey: "indexLinkSelector",
 		label: "CSS link selector on index page",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -139,7 +157,7 @@ const inputs: Inputs = [
 		siteKey: "articleBlockSelector",
 		label: "Article block selector",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -147,7 +165,7 @@ const inputs: Inputs = [
 		siteKey: "articleTitleSelector",
 		label: "article title selector",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -155,7 +173,7 @@ const inputs: Inputs = [
 		siteKey: "articleBodySelector",
 		label: "article body selector",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -163,7 +181,7 @@ const inputs: Inputs = [
 		siteKey: "articleTagSelector",
 		label: "article tags selector",
 		inputMethod: "text",
-		value: "",
+		value: undefined,
 		badgeStatus: "Pending Input",
 		errorMsg: "",
 	},
@@ -180,7 +198,7 @@ export default function InputTable() {
 			if (obj.siteKey === siteKey) {
 				let newObj = { ...obj };
 				for (const o of values) {
-					newObj = { ...obj, ...o };
+					newObj = { ...newObj, ...o };
 				}
 				return newObj;
 			}
@@ -215,7 +233,7 @@ export default function InputTable() {
 
 function Input({
 	props,
-}: { props: { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean } }): JSX.Element {
+}: { props: { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean | undefined } }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
 	const inputsRef = useContext(InputContext);
 	const nextPageType = inputsRef.find((v) => v.siteKey === "nextPageType")?.value as string;
@@ -248,17 +266,14 @@ function Input({
 		const checkedState = props.siteKey === "tagFiltering" ? tagFiltering : tagCollect;
 		inputField = (
 			<Flex gap="2" p="2">
-				<Checkbox.Root
+				<Switch
 					className="CheckboxRoot"
 					checked={checkedState}
 					id={props.siteKey}
 					onCheckedChange={() => updateInputs(props.siteKey, [{ value: !checkedState }])}
-					style={{ display: "flex", width: "20px", height: "20px", justifyContent: "center", alignItems: "center" }}
-				>
-					<Checkbox.Indicator>
-						<CheckIcon />
-					</Checkbox.Indicator>
-				</Checkbox.Root>
+					size={"2"}
+					radius="none"
+				/>
 			</Flex>
 		);
 	}
@@ -290,7 +305,7 @@ function Input({
 			<TextField.Root>
 				<TextField.Input
 					name={props.siteKey}
-					onBlur={(e) => validateInput(inputsRef, props.siteKey, e.target.value, updateInputs)}
+					onBlur={(e) => validateInput(inputsRef, props.siteKey as inputKeys, e.target.value, updateInputs)}
 				/>
 			</TextField.Root>
 		);
@@ -309,23 +324,36 @@ function Input({
 			</Table.Cell>
 			<Table.Cell>{inputField}</Table.Cell>
 			<Table.Cell>
-				<StatusBadge siteKey={props.siteKey as Partial<keyof site>} />
+				<StatusBadge siteKey={props.siteKey} />
 			</Table.Cell>
 			<Table.Cell>
-				{siteType}, {nextPageType}, {tagCollect ? "TCtrue" : "TCfalse"}, {tagFiltering ? "TFtrue" : "TFfalse"}
+				<ErrorMsg siteKey={props.siteKey} />
 			</Table.Cell>
 		</Table.Row>
 	);
 }
-
+function ErrorMsg({ siteKey }: { siteKey: Partial<keyof site> }) {
+	const inputRef = useContext(InputContext);
+	const siteKeyRef = inputRef.find((v) => v.siteKey === siteKey);
+	/** create statusBadge */
+	let errorMsg: JSX.Element = <></>;
+	if (siteKeyRef && Object.hasOwn(siteKeyRef, "errorMsg")) {
+		errorMsg = (
+			<Text as="div" size={"1"} color="tomato">
+				{siteKeyRef.errorMsg}
+			</Text>
+		);
+	}
+	return errorMsg;
+}
 function StatusBadge({ siteKey }: { siteKey: Partial<keyof site> }) {
 	const inputRef = useContext(InputContext);
-	const inputState = inputRef.find((v) => v.siteKey === siteKey);
+	const siteKeyRef = inputRef.find((v) => v.siteKey === siteKey);
 	/** create statusBadge */
 	let statusBadge: JSX.Element = <></>;
-	if (inputState && Object.hasOwn(inputState, "badgeStatus")) {
+	if (siteKeyRef && Object.hasOwn(siteKeyRef, "badgeStatus")) {
 		let color: "gray" | "green" | "tomato" = "gray";
-		switch (inputState.badgeStatus) {
+		switch (siteKeyRef.badgeStatus) {
 			case "Pending Input":
 				color = "gray";
 				break;
@@ -338,7 +366,7 @@ function StatusBadge({ siteKey }: { siteKey: Partial<keyof site> }) {
 		}
 		statusBadge = (
 			<Badge color={color} size={"2"}>
-				{inputState.badgeStatus}
+				{siteKeyRef.badgeStatus}
 			</Badge>
 		);
 	}

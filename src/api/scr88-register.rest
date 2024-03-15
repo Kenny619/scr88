@@ -1,0 +1,91 @@
+
+POST http://127.0.0.1:3001/url/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "key": "rootUrl",
+    "url": "https://enigma2.ahoseek.com/"
+}
+
+###### entryUrl
+
+POST http://127.0.0.1:3001/url/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "key": "entryUrl",
+    "url": "https://enigma2.ahoseek.com/?id=12"
+}
+
+######### index links
+
+POST http://127.0.0.1:3001/indexlinks/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "selector": "a.entry-read-link"
+}
+
+######### next URL
+POST http://127.0.0.1:3001/link/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "selector": "li.next > a"
+}
+
+######## last URL
+
+POST http://127.0.0.1:3001/link/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "selector": "li.last > a"
+}
+
+######## last URL pagenumber Regex
+
+POST http://127.0.0.1:3001/regex/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "regex": "\\/(\\d+)\\/",
+    "string": "https://enigma2.ahoseek.com/page/375/"
+}
+
+######### parameter
+
+POST http://127.0.0.1:3001/parameter/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "parameter": "id"
+}
+
+######## title
+
+
+POST http://127.0.0.1:3001/text/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "selector": "h1.entry-title"
+}
+
+######### body
+
+POST http://127.0.0.1:3001/text/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "selector": "div#the-content"
+}
+
+####### tags
+
+POST http://127.0.0.1:3001/texts/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "selector": "span.category > a"
+}

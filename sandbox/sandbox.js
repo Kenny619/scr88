@@ -1,33 +1,37 @@
-import https from "https";
-const r = 1; //null;
+import { JSDOM, ResourceLoader } from "jsdom";
+import userAgent from "../dist/app/utils/userAgents.js";
 
-const fallback = () => "fallback executed!";
+const re = "12\\";
+try {
+	const regex = new RegExp(re);
+	//console.log(regex);
+} catch (e) {
+	console.log(e);
+}
 
-const m = r ?? fallback();
+console.log("this is the end of code.");
 
-const url = "https://qiita.com/n0bisuke/items/788dc4379fd57e8453a3";
-const urlF = "https://qiita.com/n0bisuke/items/788dc4379fd57e84";
+const loader = new ResourceLoader({
+	userAgent: userAgent(),
+});
+async function serialize() {
+	try {
+		const url = "https://enigma2.ahoseek.com/";
 
-/**
- * https
-	.get(urlF, (res) => {
-		let data = "";
-		res.on("data", (chunk) => {
-			data += chunk;
-		});
-		res.on("end", () => {
-			console.log(data);
-		});
-	})
-	.on("error", (err) => {
-		console.log(err);
-	});
-*/
+		const jd = await JSDOM.fromURL(url, { resources: loader });
+		const sdom = jd.serialize();
+		const rdom = new JSDOM(sdom);
+		const extracted = rdom.window.document.querySelectorAll("a.entry-read-link");
+		if (extracted) {
+			const links = Array.from(extracted).map((el) => el.outerHTML);
 
-https
-	.get(urlF, (res) => {
-		console.log(typeof res.statusCode);
-	})
-	.on("error", (err) => {
-		console.log(err);
-	});
+			const rlinks = links.map((st) => {
+				const eldom = new JSDOM(st);
+				return eldom.window.document.querySelector("a.entry-read-link").getAttribute("href");
+			});
+			console.log(rlinks);
+		}
+	} catch (e) {
+		throw new Error(e);
+	}
+}
