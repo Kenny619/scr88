@@ -1,30 +1,48 @@
-import React, { useState, createContext, useContext } from "react";
-import { Flex, Text, RadioGroup, Table, TextField, Badge, Switch } from "@radix-ui/themes";
+import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-ui/themes";
+import type React from "react";
+import { createContext, useContext, useState } from "react";
 //import * as Switch from "@radix-ui/react-switch";
-import { CheckIcon } from "@radix-ui/react-icons";
 import type { site } from "../../typings/index";
+import { registerObj as _registerObj, registerConfig, registerObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
-type Obj = { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean | undefined };
-type Inputs = Obj[];
+type siteKeys = keyof typeof _registerObj;
+type registerKeys = "label" | "value" | "badgeStatus" | "errorMsg" | "preValidation" | "apiEndPoint" | "extracted";
+type registetInput = {
+	input: {
+		method: string;
+		defaultValue: null | boolean;
+		choices: null | string[] | boolean[];
+	};
+};
+type registerV = {
+	[key in registerKeys]: string | string[] | boolean | null;
+} & registetInput;
 
-type inputKeys = Exclude<
-	Partial<keyof site>,
-	| "language"
-	| "nextPageType"
-	| "siteType"
-	| "tagCollect"
-	| "tagFiltering"
-	| "tags"
-	| "indexTagSelector"
-	| "indexLinkBlockSelector"
->;
 type inputValues = {
-	value?: string | boolean;
-	errorMsg?: string;
-	badgeStatus?: string;
+	[key: string]: string | boolean;
 }[];
-//input field values
 
+type textInputKeys = Extract<
+	siteKeys,
+	| "name"
+	| "rootUrl"
+	| "entryUrl"
+	| "lastUrlSelector"
+	| "lastPageNumberRegExp"
+	| "nextPageParameter"
+	| "nextPageLinkSelector"
+	| "nextPageUrlRegExp"
+	| "startingPageNumber"
+	| "tags"
+	| "indexLinkSelector"
+	| "articleBlockSelector"
+	| "articleTitleSelector"
+	| "articleBodySelector"
+	| "articleTagSelector"
+>;
+
+//input field values
+/*
 const inputs: Inputs = [
 	{
 		siteKey: "name",
@@ -186,25 +204,42 @@ const inputs: Inputs = [
 		errorMsg: "",
 	},
 ];
+*/
 
-const InputContext = createContext(inputs);
-const UpdaterContext = createContext((siteKey: keyof site, values: inputValues): void => {});
+const InputContext = createContext(_registerObj);
+const UpdaterContext = createContext((siteKey: siteKeys, values: inputValues): void => {});
 
 export default function InputTable() {
-	const [inputsObj, setInputsObj] = useState(inputs);
+	const [registerObj, setRegisterObj] = useState(_registerObj);
 
-	function updateInputsObj(siteKey: keyof site, values: inputValues): void {
-		const newInputsObj = inputsObj.map((obj) => {
-			if (obj.siteKey === siteKey) {
-				let newObj = { ...obj };
-				for (const o of values) {
-					newObj = { ...newObj, ...o };
+	function updateRegisterObj(siteKey: siteKeys, values: inputValues): void {
+		let newRegisterObj = _registerObj;
+
+		for (const key of Object.keys(registerObj)) {
+			if (key === siteKey) {
+				let newRegisterVal = newRegisterObj[key];
+				for (const obj of values) {
+					newRegisterVal = { ...newRegisterVal, ...obj };
 				}
-				return newObj;
+				newRegisterObj = { ...newRegisterObj, ...newRegisterVal };
 			}
-			return obj;
-		});
-		setInputsObj(newInputsObj);
+			setRegisterObj(newRegisterObj);
+		}
+		/*
+const newRegisterObj = Object.keys(registerObj).map((key) => {
+
+	let newObj = registerObj[key as siteKeys];
+	if (key === siteKey) {
+		for(const obj of values){
+			newObj = {...newObj, ...obj};
+		}
+		return newObj;
+	}
+
+	return newObj;
+});
+		setRegisterObj(newRegisterObj);
+		*/
 	}
 
 	return (
@@ -219,10 +254,10 @@ export default function InputTable() {
 			</Table.Header>
 
 			<Table.Body className="inputFields">
-				<InputContext.Provider value={inputsObj}>
-					<UpdaterContext.Provider value={updateInputsObj}>
-						{inputs.map((obj) => {
-							return <Input props={obj} />;
+				<InputContext.Provider value={registerObj}>
+					<UpdaterContext.Provider value={updateRegisterObj}>
+						{Object.entries(registerObj).map(([key, value]) => {
+							return <Input siteKey={key as siteKeys} inputStatus={value} />;
 						})}
 					</UpdaterContext.Provider>
 				</InputContext.Provider>
@@ -231,110 +266,104 @@ export default function InputTable() {
 	);
 }
 
-function Input({
-	props,
-}: { props: { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean | undefined } }): JSX.Element {
+function Input({ siteKey, inputStatus }: { siteKey: siteKeys; inputStatus: registerV }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
 	const inputsRef = useContext(InputContext);
-	const nextPageType = inputsRef.find((v) => v.siteKey === "nextPageType")?.value as string;
-	const siteType = inputsRef.find((v) => v.siteKey === "siteType")?.value as string;
-	const tagCollect = inputsRef.find((v) => v.siteKey === "tagCollect")?.value as boolean;
-	const tagFiltering = inputsRef.find((v) => v.siteKey === "tagFiltering")?.value as boolean;
 
 	/** Skip rendering conditions:  exit if the field is not required by selected siteType and nextPageType */
 	const skipRenderConditions = [
-		(props.siteKey === "lastUrlSelector" || props.siteKey === "lastPageNumberRegExp") && nextPageType !== "last",
-		props.siteKey === "nextPageParameter" && nextPageType !== "parameter",
-		props.siteKey === "nextPageLinkSelector" && nextPageType !== "next",
-		props.siteKey === "nextPageUrlRegExp" && nextPageType !== "url",
-		props.siteKey === "startingPageNumber" && nextPageType !== "parameter" && nextPageType !== "url",
-		props.siteKey === "tags" && tagCollect === false && tagFiltering === false,
-		props.siteKey === "indexLinkSelector" && siteType !== "link",
-		props.siteKey === "articleBlockSelector" && siteType !== "multipleArticle",
-		props.siteKey === "articleTagSelector" && tagCollect === false,
+		(siteKey === "lastUrlSelector" || siteKey === "lastPageNumberRegExp") && inputsRef.nextPageType.value !== "last",
+		siteKey === "nextPageParameter" && inputsRef.nextPageType.value !== "parameter",
+		siteKey === "nextPageLinkSelector" && inputsRef.nextPageType.value !== "next",
+		siteKey === "nextPageUrlRegExp" && inputsRef.nextPageType.value !== "url",
+		siteKey === "startingPageNumber" &&
+			inputsRef.nextPageType.value !== "parameter" &&
+			inputsRef.nextPageType.value !== "url",
+		siteKey === "tags" && inputsRef.tagCollect.value === false && inputsRef.tagFiltering.value === false,
+		siteKey === "indexLinkSelector" && inputsRef.siteType.value !== "link",
+		siteKey === "articleBlockSelector" && inputsRef.siteType.value !== "multipleArticle",
+		siteKey === "articleTagSelector" && inputsRef.tagCollect.value === false,
 	];
 
 	if (skipRenderConditions.some((v) => v)) {
 		return <></>;
 	}
 
-	/** generate input field */
-	let inputField: JSX.Element = <></>;
-
-	//checkbox
-	if (props.inputMethod === "checkbox") {
-		const checkedState = props.siteKey === "tagFiltering" ? tagFiltering : tagCollect;
-		inputField = (
-			<Flex gap="2" p="2">
-				<Switch
-					className="CheckboxRoot"
-					checked={checkedState}
-					id={props.siteKey}
-					onCheckedChange={() => updateInputs(props.siteKey, [{ value: !checkedState }])}
-					size={"2"}
-					radius="none"
-				/>
-			</Flex>
-		);
-	}
-
-	//radio button
-	if (Array.isArray(props.inputMethod)) {
-		const radioGroup = (props.inputMethod as string[]).map((v) => {
-			return (
-				<Text as="label" size="2">
-					<Flex gap="2">
-						<RadioGroup.Item value={v} onClick={() => updateInputs(props.siteKey, [{ value: v }])} /> {v}
-					</Flex>
-				</Text>
-			);
-		});
-
-		inputField = (
-			<RadioGroup.Root>
-				<Flex gap="2" direction="column">
-					{radioGroup}
-				</Flex>
-			</RadioGroup.Root>
-		);
-	}
-
-	//text field
-	if (props.inputMethod === "text") {
-		inputField = (
-			<TextField.Root>
-				<TextField.Input
-					name={props.siteKey}
-					onBlur={(e) => validateInput(inputsRef, props.siteKey as inputKeys, e.target.value, updateInputs)}
-				/>
-			</TextField.Root>
-		);
-	}
+	const inputField = {
+		text: TextInputs,
+	};
 
 	//rendering table row
 	return (
-		<Table.Row key={props.siteKey as Partial<keyof site>}>
+		<Table.Row key={siteKey as Partial<keyof site>}>
 			<Table.Cell>
 				<Text as="div" size={"3"}>
-					<label>{props.siteKey}</label>
+					<label>{siteKey}</label>
 				</Text>
 				<Text as="div" size={"1"}>
-					{props.label}
+					{inputStatus.label}
 				</Text>
 			</Table.Cell>
 			<Table.Cell>{inputField}</Table.Cell>
 			<Table.Cell>
-				<StatusBadge siteKey={props.siteKey} />
+				<StatusBadge siteKey={siteKey} />
 			</Table.Cell>
 			<Table.Cell>
-				<ErrorMsg siteKey={props.siteKey} />
+				<ErrorMsg siteKey={siteKey} />
 			</Table.Cell>
 		</Table.Row>
 	);
 }
-function ErrorMsg({ siteKey }: { siteKey: Partial<keyof site> }) {
+
+function TextInputs(siteKey: textInputKeys): JSX.Element {
+	const updateInputs = useContext(UpdaterContext);
+	const inputsRef = useContext(InputContext);
+	return (
+		<TextField.Root>
+			<TextField.Input name={siteKey} onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)} />
+		</TextField.Root>
+	);
+}
+function ToggleInputs(siteKey: siteKeys, tagFilteringValue: boolean, tagCollectValue: boolean): JSX.Element {
+	const updateInputs = useContext(UpdaterContext);
+
+	const checkedState = siteKey === "tagFiltering" ? tagFilteringValue : tagCollectValue;
+	return (
+		<Flex gap="2" p="2">
+			<Switch
+				className="CheckboxRoot"
+				checked={checkedState}
+				id={siteKey}
+				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkedState }])}
+				size={"2"}
+				radius="none"
+			/>
+		</Flex>
+	);
+}
+function SelectInput(siteKey: siteKeys, choices: string[]): JSX.Element {
+	const updateInputs = useContext(UpdaterContext);
+	//radio button
+	return (
+		<RadioGroup.Root>
+			<Flex gap="2" direction="column">
+				{choices.map((v) => {
+					return (
+						<Text as="label" size="2">
+							<Flex gap="2">
+								<RadioGroup.Item value={v} onClick={() => updateInputs(siteKey, [{ value: v }])} /> {v}
+							</Flex>
+						</Text>
+					);
+				})}
+			</Flex>
+		</RadioGroup.Root>
+	);
+}
+
+function ErrorMsg({ siteKey }: { siteKey: Partial<keyof site> }): JSX.Element {
 	const inputRef = useContext(InputContext);
-	const siteKeyRef = inputRef.find((v) => v.siteKey === siteKey);
+	const siteKeyRef = inputRef[siteKey as siteKeys];
 	/** create statusBadge */
 	let errorMsg: JSX.Element = <></>;
 	if (siteKeyRef && Object.hasOwn(siteKeyRef, "errorMsg")) {
@@ -346,9 +375,10 @@ function ErrorMsg({ siteKey }: { siteKey: Partial<keyof site> }) {
 	}
 	return errorMsg;
 }
-function StatusBadge({ siteKey }: { siteKey: Partial<keyof site> }) {
+
+function StatusBadge({ siteKey }: { siteKey: Partial<keyof site> }): JSX.Element {
 	const inputRef = useContext(InputContext);
-	const siteKeyRef = inputRef.find((v) => v.siteKey === siteKey);
+	const siteKeyRef = inputRef[siteKey as siteKeys];
 	/** create statusBadge */
 	let statusBadge: JSX.Element = <></>;
 	if (siteKeyRef && Object.hasOwn(siteKeyRef, "badgeStatus")) {
