@@ -2,209 +2,9 @@ import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-
 import type React from "react";
 import { createContext, useContext, useState } from "react";
 //import * as Switch from "@radix-ui/react-switch";
-import type { site } from "../../typings/index";
-import { registerObj as _registerObj, registerConfig, registerObj } from "../config/registerConfig";
+import type { site, siteKeys, registerObj, inputValues, textInputKeys, registerValue } from "../../typings/index";
+import { rObj as _registerObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
-type siteKeys = keyof typeof _registerObj;
-type registerKeys = "label" | "value" | "badgeStatus" | "errorMsg" | "preValidation" | "apiEndPoint" | "extracted";
-type registetInput = {
-	input: {
-		method: string;
-		defaultValue: null | boolean;
-		choices: null | string[] | boolean[];
-	};
-};
-type registerV = {
-	[key in registerKeys]: string | string[] | boolean | null;
-} & registetInput;
-
-type inputValues = {
-	[key: string]: string | boolean;
-}[];
-
-type textInputKeys = Extract<
-	siteKeys,
-	| "name"
-	| "rootUrl"
-	| "entryUrl"
-	| "lastUrlSelector"
-	| "lastPageNumberRegExp"
-	| "nextPageParameter"
-	| "nextPageLinkSelector"
-	| "nextPageUrlRegExp"
-	| "startingPageNumber"
-	| "tags"
-	| "indexLinkSelector"
-	| "articleBlockSelector"
-	| "articleTitleSelector"
-	| "articleBodySelector"
-	| "articleTagSelector"
->;
-
-//input field values
-/*
-const inputs: Inputs = [
-	{
-		siteKey: "name",
-		label: "Site name",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-
-	{
-		siteKey: "rootUrl",
-		label: "Target site FQDN",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "entryUrl",
-		label: "Entry point URL",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "language",
-		label: "languages",
-		inputMethod: ["JP", "EN"],
-		value: undefined,
-	},
-	{
-		siteKey: "saveDir",
-		label: "output Dir",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "siteType",
-		label: "site type",
-		inputMethod: ["link", "singleArticle", "multipleArticle"],
-		value: undefined,
-	},
-	{
-		siteKey: "nextPageType",
-		label: "next page type",
-		inputMethod: ["last", "next", "parameter", "url"],
-		value: undefined,
-	},
-	{
-		siteKey: "lastUrlSelector",
-		label: "CSS link selector of last URL",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "lastPageNumberRegExp",
-		label: "last URL pageNumber RegExp",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "nextPageParameter",
-		label: "pageNumber URL parameter",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "nextPageLinkSelector",
-		label: "CSS link selector of next URL",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "nextPageUrlRegExp",
-		label: "in-URL pageNumber RegExp",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "startingPageNumber",
-		label: "Starting page number (if not 1)",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "tagFiltering",
-		label: "Check to enable tag filtering",
-		inputMethod: "checkbox",
-		value: false,
-	},
-	{
-		siteKey: "tagCollect",
-		label: "Check to Acquire tagss",
-		inputMethod: "checkbox",
-		value: false,
-	},
-	{
-		siteKey: "tags",
-		label: "Input comma separated tags for filtering use",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "indexLinkSelector",
-		label: "CSS link selector on index page",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "articleBlockSelector",
-		label: "Article block selector",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "articleTitleSelector",
-		label: "article title selector",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "articleBodySelector",
-		label: "article body selector",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-	{
-		siteKey: "articleTagSelector",
-		label: "article tags selector",
-		inputMethod: "text",
-		value: undefined,
-		badgeStatus: "Pending Input",
-		errorMsg: "",
-	},
-];
-*/
 
 const InputContext = createContext(_registerObj);
 const UpdaterContext = createContext((siteKey: siteKeys, values: inputValues): void => {});
@@ -213,33 +13,18 @@ export default function InputTable() {
 	const [registerObj, setRegisterObj] = useState(_registerObj);
 
 	function updateRegisterObj(siteKey: siteKeys, values: inputValues): void {
-		let newRegisterObj = _registerObj;
+		const newRegisterObj: registerObj = registerObj;
 
-		for (const key of Object.keys(registerObj)) {
+		for (const key of Object.keys(newRegisterObj)) {
 			if (key === siteKey) {
 				let newRegisterVal = newRegisterObj[key];
 				for (const obj of values) {
 					newRegisterVal = { ...newRegisterVal, ...obj };
 				}
-				newRegisterObj = { ...newRegisterObj, ...newRegisterVal };
+				newRegisterObj[key] = { ...newRegisterVal };
 			}
-			setRegisterObj(newRegisterObj);
 		}
-		/*
-const newRegisterObj = Object.keys(registerObj).map((key) => {
-
-	let newObj = registerObj[key as siteKeys];
-	if (key === siteKey) {
-		for(const obj of values){
-			newObj = {...newObj, ...obj};
-		}
-		return newObj;
-	}
-
-	return newObj;
-});
 		setRegisterObj(newRegisterObj);
-		*/
 	}
 
 	return (
@@ -257,7 +42,7 @@ const newRegisterObj = Object.keys(registerObj).map((key) => {
 				<InputContext.Provider value={registerObj}>
 					<UpdaterContext.Provider value={updateRegisterObj}>
 						{Object.entries(registerObj).map(([key, value]) => {
-							return <Input siteKey={key as siteKeys} inputStatus={value} />;
+							return <Input siteKey={key as siteKeys} inputParams={value} />;
 						})}
 					</UpdaterContext.Provider>
 				</InputContext.Provider>
@@ -266,8 +51,7 @@ const newRegisterObj = Object.keys(registerObj).map((key) => {
 	);
 }
 
-function Input({ siteKey, inputStatus }: { siteKey: siteKeys; inputStatus: registerV }): JSX.Element {
-	const updateInputs = useContext(UpdaterContext);
+function Input({ siteKey, inputParams }: { siteKey: siteKeys; inputParams: registerValue }): JSX.Element {
 	const inputsRef = useContext(InputContext);
 
 	/** Skip rendering conditions:  exit if the field is not required by selected siteType and nextPageType */
@@ -288,11 +72,6 @@ function Input({ siteKey, inputStatus }: { siteKey: siteKeys; inputStatus: regis
 	if (skipRenderConditions.some((v) => v)) {
 		return <></>;
 	}
-
-	const inputField = {
-		text: TextInputs,
-	};
-
 	//rendering table row
 	return (
 		<Table.Row key={siteKey as Partial<keyof site>}>
@@ -301,10 +80,14 @@ function Input({ siteKey, inputStatus }: { siteKey: siteKeys; inputStatus: regis
 					<label>{siteKey}</label>
 				</Text>
 				<Text as="div" size={"1"}>
-					{inputStatus.label}
+					{inputParams.label}
 				</Text>
 			</Table.Cell>
-			<Table.Cell>{inputField}</Table.Cell>
+			<Table.Cell>
+				{inputParams.input.method === "text" && <TextInputs siteKey={siteKey as textInputKeys} />}
+				{inputParams.input.method === "toggle" && <ToggleInputs siteKey={siteKey} />}
+				{inputParams.input.method === "select" && <SelectInput siteKey={siteKey} />}
+			</Table.Cell>
 			<Table.Cell>
 				<StatusBadge siteKey={siteKey} />
 			</Table.Cell>
@@ -315,7 +98,7 @@ function Input({ siteKey, inputStatus }: { siteKey: siteKeys; inputStatus: regis
 	);
 }
 
-function TextInputs(siteKey: textInputKeys): JSX.Element {
+function TextInputs({ siteKey }: { siteKey: textInputKeys }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
 	const inputsRef = useContext(InputContext);
 	return (
@@ -324,15 +107,18 @@ function TextInputs(siteKey: textInputKeys): JSX.Element {
 		</TextField.Root>
 	);
 }
-function ToggleInputs(siteKey: siteKeys, tagFilteringValue: boolean, tagCollectValue: boolean): JSX.Element {
+function ToggleInputs({ siteKey }: { siteKey: siteKeys }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
+	const inputsRef = useContext(InputContext);
+	const tagFilteringValue = inputsRef.tagFiltering.value;
+	const tagCollectValue = inputsRef.tagCollect.value;
 
 	const checkedState = siteKey === "tagFiltering" ? tagFilteringValue : tagCollectValue;
 	return (
 		<Flex gap="2" p="2">
 			<Switch
 				className="CheckboxRoot"
-				checked={checkedState}
+				checked={checkedState as boolean}
 				id={siteKey}
 				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkedState }])}
 				size={"2"}
@@ -341,8 +127,10 @@ function ToggleInputs(siteKey: siteKeys, tagFilteringValue: boolean, tagCollectV
 		</Flex>
 	);
 }
-function SelectInput(siteKey: siteKeys, choices: string[]): JSX.Element {
+function SelectInput({ siteKey }: { siteKey: siteKeys }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
+	const inputsRef = useContext(InputContext);
+	const choices = inputsRef[siteKey].input.choices as string[];
 	//radio button
 	return (
 		<RadioGroup.Root>

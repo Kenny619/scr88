@@ -10,9 +10,6 @@ export interface site {
 	//Initial URL to start scraping
 	entryUrl: string;
 
-	//Output dir path
-	saveDir: string;
-
 	//Language of the source site.  Output file
 	language: "JP" | "EN";
 
@@ -64,16 +61,10 @@ export interface site {
 	//if tagFiltering is true.  Tags used to filter the articles
 	tags?: string[];
 
-	//if tagFiltering is true. | CSS selector for the tags on index page
-	indexTagSelector?: string;
-
 	//if tagFiltering is true OR tagCollection is true | CSS selector for the tags
 	articleTagSelector?: string;
 
 	/** optional: siteType parameters ----------------------------- */
-
-	//CSS selector for capturing link block on index page
-	indexLinkBlockSelector?: string;
 
 	//CSS selector for capturing link to the article page
 	indexLinkSelector?: string;
@@ -81,3 +72,5 @@ export interface site {
 	//CSS selector for capturing article block on multi-article page
 	articleBlockSelector?: string;
 }
+
+export type siteKeys = keyof site;

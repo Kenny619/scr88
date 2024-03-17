@@ -1,217 +1,12 @@
-export const registerConfig =
-	[
-		{
-			siteKey: "name",
-			label: "Scraper config name",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/name"
-		},
-		{
-			siteKey: "rootUrl",
-			label: "Target site FQDN",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/url"
-		},
-		{
-			siteKey: "entryUrl",
-			label: "Target site entry point URL",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/url"
-		},
-		{
-			siteKey: "language",
-			label: "Target site language JP or EN",
-			inputMethod: "select",
-			value: ["JP", "EN"],
-			badgeStatus: null,
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: null
-		},
-		{
-			siteKey: "siteType",
-			label: "Target site page structure",
-			inputMethod: "select",
-			value: ["links", "single", "multiple"],
-			badgeStatus: null,
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: null
-		},
-		{
-			siteKey: "nextPageType",
-			label: "Next page URL source",
-			inputMethod: "select",
-			value: ["last", "parameter", "url", "next", "pagenation"],
-			badgeStatus: null,
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: null
-		},
-		{
-			siteKey: "lastUrlSelector",
-			label: "CSS link selector of last URL",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/lasturl"
-		},
-		{
-			siteKey: "lastPageNumberRegExp",
-			label: "Last URL pageNumber RegExp",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/lasturlregex"
-		},
-		{
-			siteKey: "nextPageParameter",
-			label: "URL parameter name for page number",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/parameter"
-		},
-		{
-			siteKey: "nextPageLinkSelector",
-			label: "CSS selector for acquiring the next page URL",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/link"
-		},
-		{
-			siteKey: "nextPageUrlRegExp",
-			label: "Regex for acquiring the page number within the URL",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/nexturlregex"
-		},
-		{
-			siteKey: "startingPageNumber",
-			label: "Set starting page number.",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: "entryUrl, number",
-			apiEndPoint: null
-		},
-		{
-			siteKey: "tagFiltering",
-			label: "Enable to scrape articles that match the tags",
-			inputMethod: "toggle",
-			value: false,
-			badgeStatus: null,
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: null
-		},
-		{
-			siteKey: "tagCollect",
-			label: "Enable to scrape article tags",
-			inputMethod: "toggle",
-			value: false,
-			badgeStatus: null,
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: null
-		},
-		{
-			siteKey: "tags",
-			label: "Provide tags for tag filtering.",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: null
-		},
-		{
-			siteKey: "indexLinkSelector",
-			label: "CSS link selector for links on the index page.",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/indexlinks"
-		},
-		{
-			siteKey: "articleBlockSelector",
-			label: "CSS selector for article blocks",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/nodes"
-		},
-		{
-			siteKey: "articleTitleSelector",
-			label: "CSS selector for article title",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/text"
-		},
-		{
-			siteKey: "articleBodySelector",
-			label: "CSS selector for article body",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/text"
-		},
-		{
-			siteKey: "articleTagSelector",
-			label: "CSS selector for article tags",
-			inputMethod: "text",
-			value: null,
-			badgeStatus: "Pending Input",
-			errorMsg: null,
-			preValidation: null,
-			apiEndPoint: "/text"
-		}
-	]
+import type { registerObj } from "../../typings/index";
 
-
-export const registerObj =
-{
-
+export const rObj: registerObj = {
 	name: {
 		label: "Scraper config name",
 		input: {
 			method: "text",
 			defaultValue: null,
-			choices: null
+			choices: null,
 		},
 		value: null,
 		badgeStatus: "Pending Input",
@@ -273,8 +68,8 @@ export const registerObj =
 		badgeStatus: null,
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: null
-		, extracted: null
+		apiEndPoint: null,
+		extracted: null,
 	},
 	nextPageType: {
 		label: "Next page URL source",
@@ -287,8 +82,8 @@ export const registerObj =
 		badgeStatus: null,
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: null
-		, extracted: null
+		apiEndPoint: null,
+		extracted: null,
 	},
 
 	lastUrlSelector: {
@@ -302,8 +97,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/lasturl"
-		, extracted: null
+		apiEndPoint: "/lasturl",
+		extracted: null,
 	},
 
 	lastPageNumberRegExp: {
@@ -317,8 +112,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/lasturlregex"
-		, extracted: null
+		apiEndPoint: "/lasturlregex",
+		extracted: null,
 	},
 
 	nextPageParameter: {
@@ -332,8 +127,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/parameter"
-		, extracted: null
+		apiEndPoint: "/parameter",
+		extracted: null,
 	},
 
 	nextPageLinkSelector: {
@@ -347,8 +142,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/link"
-		, extracted: null
+		apiEndPoint: "/link",
+		extracted: null,
 	},
 
 	nextPageUrlRegExp: {
@@ -362,8 +157,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/nexturlregex"
-		, extracted: null
+		apiEndPoint: "/nexturlregex",
+		extracted: null,
 	},
 	startingPageNumber: {
 		label: "Set starting page number.",
@@ -376,8 +171,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: "entryUrl, number",
-		apiEndPoint: null
-		, extracted: null
+		apiEndPoint: null,
+		extracted: null,
 	},
 	tagFiltering: {
 		label: "Enable to scrape articles that match the tags",
@@ -390,8 +185,8 @@ export const registerObj =
 		badgeStatus: null,
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: null
-		, extracted: null
+		apiEndPoint: null,
+		extracted: null,
 	},
 	tagCollect: {
 		label: "Enable to scrape article tags",
@@ -404,8 +199,8 @@ export const registerObj =
 		badgeStatus: null,
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: null
-		, extracted: null
+		apiEndPoint: null,
+		extracted: null,
 	},
 	tags: {
 		label: "Provide tags for tag filtering.",
@@ -418,8 +213,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: null
-		, extracted: null
+		apiEndPoint: null,
+		extracted: null,
 	},
 	indexLinkSelector: {
 		label: "CSS link selector for links on the index page.",
@@ -432,8 +227,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/indexlinks"
-		, extracted: null
+		apiEndPoint: "/indexlinks",
+		extracted: null,
 	},
 	articleBlockSelector: {
 		label: "CSS selector for article blocks",
@@ -446,8 +241,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/nodes"
-		, extracted: null
+		apiEndPoint: "/nodes",
+		extracted: null,
 	},
 	articleTitleSelector: {
 		label: "CSS selector for article title",
@@ -460,8 +255,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/text"
-		, extracted: null
+		apiEndPoint: "/text",
+		extracted: null,
 	},
 	articleBodySelector: {
 		label: "CSS selector for article body",
@@ -474,8 +269,8 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/text"
-		, extracted: null
+		apiEndPoint: "/text",
+		extracted: null,
 	},
 	articleTagSelector: {
 		label: "CSS selector for article tags",
@@ -488,7 +283,7 @@ export const registerObj =
 		badgeStatus: "Pending Input",
 		errorMsg: null,
 		preValidation: null,
-		apiEndPoint: "/text"
-		, extracted: null
-	}
-}
+		apiEndPoint: "/text",
+		extracted: null,
+	},
+};

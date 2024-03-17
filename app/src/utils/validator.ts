@@ -1,34 +1,16 @@
-import type { site } from "../../typings/index";
+import type { site, registerObj, inputValues, textInputKeys } from "../../typings/index";
 import v from "validator";
-type Obj = { siteKey: Partial<keyof site>; [key: string]: string | string[] | boolean | undefined };
-type Inputs = Obj[];
-type inputsRef = { [Property in keyof Partial<site>]: string };
-type inputValues = {
-	value?: string | boolean;
-	errorMsg?: string;
-	badgeStatus?: string;
-}[];
-type inputKeys = Exclude<
-	Partial<keyof site>,
-	| "language"
-	| "nextPageType"
-	| "siteType"
-	| "tagCollect"
-	| "tagFiltering"
-	| "tags"
-	| "indexTagSelector"
-	| "indexLinkBlockSelector"
->;
+type valKeys = Exclude<textInputKeys, "tags">;
 type valRef = {
-	[key in inputKeys]: {
+	[key in valKeys]: {
 		pre: Array<() => string>;
 		ep?: string;
 	};
 };
 
 export default function validateInput(
-	inputs: Inputs,
-	key: inputKeys,
+	inputs: registerObj,
+	key: textInputKeys,
 	value: string,
 	updater: (siteKey: keyof site, values: inputValues) => void,
 ) {
@@ -38,11 +20,12 @@ export default function validateInput(
 		return;
 	}
 	//Create new object inputsRef from taking siteKey as a key and value as its value from inputs
+	/*
 	const inputsRef: inputsRef = inputs.reduce((acc, curr) => {
 		const a = acc;
 		return { ...a, [curr.siteKey]: curr.value };
 	}, {});
-
+*/
 	/*
 name
 rootUrl - format: url　-> /url
@@ -64,7 +47,7 @@ articleTagSelector - entryUrl, tags -> /texts
 */
 	validation(key, value);
 
-	function validation(key: inputKeys, value: string) {
+	function validation(key: textInputKeys, value: string) {
 		const conds = {
 			url: () => {
 				return v.isURL(value) ? "" : "Input needs to be in a valid URL format.";
@@ -73,19 +56,19 @@ articleTagSelector - entryUrl, tags -> /texts
 				return typeof Number(value) === "number" ? "" : "Input needs to be a number.";
 			},
 			language: () => {
-				return inputsRef.language ? "" : "language needs to be selected.";
+				return inputs.language.value ? "" : "language needs to be selected.";
 			},
 			siteType: () => {
-				return inputsRef.siteType ? "" : "siteType needs to be selected.";
+				return inputs.siteType.value ? "" : "siteType needs to be selected.";
 			},
 			entryUrl: () => {
-				return inputsRef.entryUrl ? "" : "Requires entryUrl input.";
+				return inputs.entryUrl.value ? "" : "Requires entryUrl input.";
 			},
 			tags: () => {
-				return inputsRef.tags ? "" : "Requires tags input.";
+				return inputs.tags.value ? "" : "Requires tags input.";
 			},
 			lastUrl: () => {
-				return inputsRef.lastUrlSelector ? "" : "Requires lastUrlSelector input.";
+				return inputs.lastUrlSelector.value ? "" : "Requires lastUrlSelector input.";
 			},
 		};
 
@@ -93,7 +76,6 @@ articleTagSelector - entryUrl, tags -> /texts
 			name: { pre: [], ep: "/name" },
 			rootUrl: { pre: [conds.url], ep: "/url" },
 			entryUrl: { pre: [conds.url], ep: "/url" },
-			saveDir: { pre: [], ep: "/dir" },
 			lastUrlSelector: { pre: [conds.entryUrl], ep: "/lasturl" },
 			lastPageNumberRegExp: { pre: [conds.entryUrl, conds.lastUrl], ep: "/lasturlregex" },
 			nextPageParameter: { pre: [conds.entryUrl], ep: "/parameter" },
@@ -104,16 +86,16 @@ articleTagSelector - entryUrl, tags -> /texts
 			articleBlockSelector: { pre: [conds.entryUrl], ep: "/nodes" },
 			articleTitleSelector: { pre: [conds.entryUrl], ep: "/text" },
 			articleBodySelector: { pre: [conds.entryUrl], ep: "/text" },
-			articleTagSelector: { pre: [conds.entryUrl], ep: "/texts" },
+			articleTagSelector: { pre: [conds.entryUrl, conds.tags], ep: "/texts" },
 		};
 
 		if (!Object.hasOwn(valRef, key)) {
-			//no validation.  update the Badge with 'pass'
+			//no validation.  update the Badge with 'pass' For tags, name -> until dblookup process is set.
 			updater(key, [{ value: value, badgeStatus: "Pass" }]);
 			return;
 		}
 
-		const preErr = valRef[key].pre
+		const preErr = valRef[key as valKeys].pre
 			.map((fn) => fn())
 			.filter((v) => v.length > 0)
 			.join("<br/>\r\n");
@@ -129,14 +111,14 @@ articleTagSelector - entryUrl, tags -> /texts
 		const postVal =
 			key === "lastPageNumberRegExp" || key === "nextPageUrlRegExp" ? value.replace(/\\/g, "\\\\") : value;
 
-		if (Object.hasOwn(valRef[key], "ep") && typeof valRef[key].ep === "string") {
-			const endpoint = valRef[key].ep as string;
+		if (Object.hasOwn(valRef[key as valKeys], "ep") && typeof valRef[key as valKeys].ep === "string") {
+			const endpoint = valRef[key as valKeys].ep as string;
 			console.log(endpoint, postVal, key);
 			apiRequest(endpoint, key, postVal);
 		}
 	}
 
-	function apiRequest(endpoint: string, key: inputKeys, value: string) {
+	function apiRequest(endpoint: string, key: textInputKeys, value: string) {
 		const postData = {
 			key: key,
 			input: value,
