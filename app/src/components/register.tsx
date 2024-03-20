@@ -1,7 +1,6 @@
 import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-ui/themes";
 import { createContext, useContext, useState } from "react";
-//import * as Switch from "@radix-ui/react-switch";
-import type { site, siteKeys, registerObj, inputValues, textInputKeys, registerValue } from "../../typings/index";
+import type { inputValues, registerObj, registerValue, site, siteKeys, textInputKeys } from "../../typings/index";
 import { rObj as _registerObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
 
@@ -12,7 +11,7 @@ export default function InputTable() {
 	const [registerObj, setRegisterObj] = useState(_registerObj);
 
 	function updateRegisterObj(siteKey: siteKeys, values: inputValues): void {
-		const newRegisterObj: registerObj = registerObj;
+		const newRegisterObj: registerObj = { ...registerObj };
 
 		for (const key of Object.keys(newRegisterObj)) {
 			if (key === siteKey) {
@@ -23,9 +22,10 @@ export default function InputTable() {
 				newRegisterObj[key] = { ...newRegisterVal };
 			}
 		}
-		console.log(newRegisterObj);
 		setRegisterObj(newRegisterObj);
 	}
+
+	//If below conditions were met, then move to save page
 
 	return (
 		<Table.Root>
@@ -77,7 +77,7 @@ function TableRow({ siteKey, renderingParams }: { siteKey: siteKeys; renderingPa
 		<Table.Row key={siteKey}>
 			<Table.Cell>
 				<Text as="div" size={"3"}>
-					<label>{siteKey}</label>
+					<label htmlFor={siteKey}>{siteKey}</label>
 				</Text>
 				<Text as="div" size={"1"}>
 					{renderingParams.label}
@@ -105,8 +105,10 @@ function TextInputs({ siteKey }: { siteKey: textInputKeys }): JSX.Element {
 		<Flex gap={"2"} p={"2"}>
 			<TextField.Root>
 				<TextField.Input
+					id={siteKey}
 					name={siteKey}
 					onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)}
+					autoComplete={siteKey}
 				/>
 			</TextField.Root>
 		</Flex>
@@ -118,7 +120,6 @@ function ToggleInputs({ siteKey }: { siteKey: siteKeys }): JSX.Element {
 	const inputRef = useContext(InputContext);
 
 	const checkStatus = inputRef[siteKey].value;
-	console.log(siteKey, checkStatus);
 
 	return (
 		<Flex gap="2" p="2">
@@ -145,7 +146,8 @@ function SelectInput({ siteKey }: { siteKey: siteKeys }): JSX.Element {
 					return (
 						<Text as="label" size="2" key={v}>
 							<Flex gap="2">
-								<RadioGroup.Item key={v} value={v} onClick={() => updateInputs(siteKey, [{ value: v }])} /> {v}
+								<RadioGroup.Item id={siteKey} key={v} value={v} onClick={() => updateInputs(siteKey, [{ value: v }])} />
+								{v}
 							</Flex>
 						</Text>
 					);
