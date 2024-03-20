@@ -1,5 +1,4 @@
 import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-ui/themes";
-import type React from "react";
 import { createContext, useContext, useState } from "react";
 //import * as Switch from "@radix-ui/react-switch";
 import type { site, siteKeys, registerObj, inputValues, textInputKeys, registerValue } from "../../typings/index";
@@ -24,6 +23,7 @@ export default function InputTable() {
 				newRegisterObj[key] = { ...newRegisterVal };
 			}
 		}
+		console.log(newRegisterObj);
 		setRegisterObj(newRegisterObj);
 	}
 
@@ -42,7 +42,7 @@ export default function InputTable() {
 				<InputContext.Provider value={registerObj}>
 					<UpdaterContext.Provider value={updateRegisterObj}>
 						{Object.entries(registerObj).map(([key, value]) => {
-							return <Input siteKey={key as siteKeys} inputParams={value} />;
+							return <TableRow key={key} siteKey={key as siteKeys} renderingParams={value} />;
 						})}
 					</UpdaterContext.Provider>
 				</InputContext.Provider>
@@ -51,7 +51,7 @@ export default function InputTable() {
 	);
 }
 
-function Input({ siteKey, inputParams }: { siteKey: siteKeys; inputParams: registerValue }): JSX.Element {
+function TableRow({ siteKey, renderingParams }: { siteKey: siteKeys; renderingParams: registerValue }): JSX.Element {
 	const inputsRef = useContext(InputContext);
 
 	/** Skip rendering conditions:  exit if the field is not required by selected siteType and nextPageType */
@@ -64,7 +64,7 @@ function Input({ siteKey, inputParams }: { siteKey: siteKeys; inputParams: regis
 			inputsRef.nextPageType.value !== "parameter" &&
 			inputsRef.nextPageType.value !== "url",
 		siteKey === "tags" && inputsRef.tagCollect.value === false && inputsRef.tagFiltering.value === false,
-		siteKey === "indexLinkSelector" && inputsRef.siteType.value !== "link",
+		siteKey === "indexLinkSelector" && inputsRef.siteType.value !== "links",
 		siteKey === "articleBlockSelector" && inputsRef.siteType.value !== "multipleArticle",
 		siteKey === "articleTagSelector" && inputsRef.tagCollect.value === false,
 	];
@@ -74,19 +74,19 @@ function Input({ siteKey, inputParams }: { siteKey: siteKeys; inputParams: regis
 	}
 	//rendering table row
 	return (
-		<Table.Row key={siteKey as Partial<keyof site>}>
+		<Table.Row key={siteKey}>
 			<Table.Cell>
 				<Text as="div" size={"3"}>
 					<label>{siteKey}</label>
 				</Text>
 				<Text as="div" size={"1"}>
-					{inputParams.label}
+					{renderingParams.label}
 				</Text>
 			</Table.Cell>
 			<Table.Cell>
-				{inputParams.input.method === "text" && <TextInputs siteKey={siteKey as textInputKeys} />}
-				{inputParams.input.method === "toggle" && <ToggleInputs siteKey={siteKey} />}
-				{inputParams.input.method === "select" && <SelectInput siteKey={siteKey} />}
+				{renderingParams.input.method === "text" && <TextInputs siteKey={siteKey as textInputKeys} />}
+				{renderingParams.input.method === "toggle" && <ToggleInputs siteKey={siteKey} />}
+				{renderingParams.input.method === "select" && <SelectInput siteKey={siteKey} />}
 			</Table.Cell>
 			<Table.Cell>
 				<StatusBadge siteKey={siteKey} />
@@ -102,25 +102,31 @@ function TextInputs({ siteKey }: { siteKey: textInputKeys }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
 	const inputsRef = useContext(InputContext);
 	return (
-		<TextField.Root>
-			<TextField.Input name={siteKey} onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)} />
-		</TextField.Root>
+		<Flex gap={"2"} p={"2"}>
+			<TextField.Root>
+				<TextField.Input
+					name={siteKey}
+					onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)}
+				/>
+			</TextField.Root>
+		</Flex>
 	);
 }
+
 function ToggleInputs({ siteKey }: { siteKey: siteKeys }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
-	const inputsRef = useContext(InputContext);
-	const tagFilteringValue = inputsRef.tagFiltering.value;
-	const tagCollectValue = inputsRef.tagCollect.value;
+	const inputRef = useContext(InputContext);
 
-	const checkedState = siteKey === "tagFiltering" ? tagFilteringValue : tagCollectValue;
+	const checkStatus = inputRef[siteKey].value;
+	console.log(siteKey, checkStatus);
+
 	return (
 		<Flex gap="2" p="2">
 			<Switch
 				className="CheckboxRoot"
-				checked={checkedState as boolean}
+				checked={checkStatus as boolean}
 				id={siteKey}
-				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkedState }])}
+				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])}
 				size={"2"}
 				radius="none"
 			/>
@@ -137,9 +143,9 @@ function SelectInput({ siteKey }: { siteKey: siteKeys }): JSX.Element {
 			<Flex gap="2" direction="column">
 				{choices.map((v) => {
 					return (
-						<Text as="label" size="2">
+						<Text as="label" size="2" key={v}>
 							<Flex gap="2">
-								<RadioGroup.Item value={v} onClick={() => updateInputs(siteKey, [{ value: v }])} /> {v}
+								<RadioGroup.Item key={v} value={v} onClick={() => updateInputs(siteKey, [{ value: v }])} /> {v}
 							</Flex>
 						</Text>
 					);
@@ -166,12 +172,11 @@ function ErrorMsg({ siteKey }: { siteKey: Partial<keyof site> }): JSX.Element {
 
 function StatusBadge({ siteKey }: { siteKey: Partial<keyof site> }): JSX.Element {
 	const inputRef = useContext(InputContext);
-	const siteKeyRef = inputRef[siteKey as siteKeys];
 	/** create statusBadge */
 	let statusBadge: JSX.Element = <></>;
-	if (siteKeyRef && Object.hasOwn(siteKeyRef, "badgeStatus")) {
+	if (inputRef[siteKey].badgeStatus !== null) {
 		let color: "gray" | "green" | "tomato" = "gray";
-		switch (siteKeyRef.badgeStatus) {
+		switch (inputRef[siteKey].badgeStatus) {
 			case "Pending Input":
 				color = "gray";
 				break;
@@ -184,7 +189,7 @@ function StatusBadge({ siteKey }: { siteKey: Partial<keyof site> }): JSX.Element
 		}
 		statusBadge = (
 			<Badge color={color} size={"2"}>
-				{siteKeyRef.badgeStatus}
+				{inputRef[siteKey].badgeStatus}
 			</Badge>
 		);
 	}
