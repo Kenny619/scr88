@@ -36,7 +36,6 @@ export type textInputKeys = Extract<
 	| "nextPageParameter"
 	| "nextPageLinkSelector"
 	| "nextPageUrlRegExp"
-	| "startingPageNumber"
 	| "tags"
 	| "indexLinkSelector"
 	| "articleBlockSelector"
