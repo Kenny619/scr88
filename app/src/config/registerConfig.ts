@@ -160,20 +160,6 @@ export const rObj: registerObj = {
 		apiEndPoint: "/nexturlregex",
 		extracted: null,
 	},
-	startingPageNumber: {
-		label: "Set starting page number.",
-		input: {
-			method: "text",
-			defaultValue: null,
-			choices: null,
-		},
-		value: null,
-		badgeStatus: "Pending Input",
-		errorMsg: null,
-		preValidation: "entryUrl, number",
-		apiEndPoint: null,
-		extracted: null,
-	},
 	tagFiltering: {
 		label: "Enable to scrape articles that match the tags",
 		input: {

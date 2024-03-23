@@ -60,9 +60,6 @@ function TableRow({ siteKey, renderingParams }: { siteKey: siteKeys; renderingPa
 		siteKey === "nextPageParameter" && inputsRef.nextPageType.value !== "parameter",
 		siteKey === "nextPageLinkSelector" && inputsRef.nextPageType.value !== "next",
 		siteKey === "nextPageUrlRegExp" && inputsRef.nextPageType.value !== "url",
-		siteKey === "startingPageNumber" &&
-			inputsRef.nextPageType.value !== "parameter" &&
-			inputsRef.nextPageType.value !== "url",
 		siteKey === "tags" && inputsRef.tagCollect.value === false && inputsRef.tagFiltering.value === false,
 		siteKey === "indexLinkSelector" && inputsRef.siteType.value !== "links",
 		siteKey === "articleBlockSelector" && inputsRef.siteType.value !== "multipleArticle",

@@ -53,9 +53,6 @@ export interface site {
 	//if nextPageType === "url" | RegExp for picking the page number from URL
 	nextPageUrlRegExp?: string;
 
-	//if nextPageType === "pagenation" && starting page is not the top/first page.
-	startingPageNumber?: number;
-
 	/** optional: Tags ----------------------------- */
 
 	//if tagFiltering is true.  Tags used to filter the articles

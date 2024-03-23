@@ -19,6 +19,10 @@ export default function validateInput(
 		updater(key, [{ badgeStatus: "Pending Input" }, { errorMsg: "" }]);
 		return;
 	}
+
+	//Change the badge status to Checking until the test result comes back
+	updater(key, [{ badgeStatus: "Checking..." }, { errorMsg: "" }]);
+
 	//Create new object inputsRef from taking siteKey as a key and value as its value from inputs
 	/*
 	const inputsRef: inputsRef = inputs.reduce((acc, curr) => {
@@ -81,7 +85,6 @@ articleTagSelector - entryUrl, tags -> /texts
 			nextPageParameter: { pre: [conds.entryUrl], ep: "/parameter" },
 			nextPageLinkSelector: { pre: [conds.entryUrl], ep: "/link" },
 			nextPageUrlRegExp: { pre: [conds.entryUrl], ep: "/nexturlregex" },
-			startingPageNumber: { pre: [conds.number] },
 			indexLinkSelector: { pre: [conds.entryUrl], ep: "/indexlinks" },
 			articleBlockSelector: { pre: [conds.entryUrl], ep: "/nodes" },
 			articleTitleSelector: { pre: [conds.entryUrl], ep: "/text" },
@@ -135,7 +138,7 @@ articleTagSelector - entryUrl, tags -> /texts
 			.then(async (response) => {
 				const res = await response.json();
 				res.pass
-					? updater(key, [{ value: value }, { badgeStatus: "Pass" }])
+					? updater(key, [{ value: value }, { badgeStatus: "Pass" }, { errorMsg: "" }])
 					: updater(key, [{ errorMsg: res.errMsg }, { badgeStatus: "Fail" }]);
 			})
 			.catch((e) => {
