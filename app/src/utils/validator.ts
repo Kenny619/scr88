@@ -1,18 +1,17 @@
-import type { site, registerObj, inputValues, textInputKeys } from "../../typings/index";
+import type { RegisterObj, updateValues } from "../../typings/index";
 import v from "validator";
-type valKeys = Exclude<textInputKeys, "tags">;
 type valRef = {
-	[key in valKeys]: {
+	[key: string]: {
 		pre: Array<() => string>;
 		ep?: string;
 	};
 };
 
 export default function validateInput(
-	inputs: registerObj,
-	key: textInputKeys,
+	inputs: RegisterObj,
+	key: string,
 	value: string,
-	updater: (siteKey: keyof site, values: inputValues) => void,
+	updater: (siteKey: string, values: updateValues) => void,
 ) {
 	//Escape - if value is not provided, exit the function
 	if (!value) {
@@ -51,7 +50,7 @@ articleTagSelector - entryUrl, tags -> /texts
 */
 	validation(key, value);
 
-	function validation(key: textInputKeys, value: string) {
+	function validation(key: string, value: string) {
 		const conds = {
 			url: () => {
 				return v.isURL(value) ? "" : "Input needs to be in a valid URL format.";
@@ -98,7 +97,7 @@ articleTagSelector - entryUrl, tags -> /texts
 			return;
 		}
 
-		const preErr = valRef[key as valKeys].pre
+		const preErr = valRef[key].pre
 			.map((fn) => fn())
 			.filter((v) => v.length > 0)
 			.join("<br/>\r\n");
@@ -114,14 +113,14 @@ articleTagSelector - entryUrl, tags -> /texts
 		const postVal =
 			key === "lastPageNumberRegExp" || key === "nextPageUrlRegExp" ? value.replace(/\\/g, "\\\\") : value;
 
-		if (Object.hasOwn(valRef[key as valKeys], "ep") && typeof valRef[key as valKeys].ep === "string") {
-			const endpoint = valRef[key as valKeys].ep as string;
+		if (Object.hasOwn(valRef[key], "ep") && typeof valRef[key].ep === "string") {
+			const endpoint = valRef[key].ep as string;
 			console.log(endpoint, postVal, key);
 			apiRequest(endpoint, key, postVal);
 		}
 	}
 
-	function apiRequest(endpoint: string, key: textInputKeys, value: string) {
+	function apiRequest(endpoint: string, key: string, value: string) {
 		const postData = {
 			key: key,
 			input: value,

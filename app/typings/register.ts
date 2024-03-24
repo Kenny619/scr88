@@ -1,45 +1,34 @@
-import type { siteKeys } from "./site";
-type registerKeys = "label" | "value" | "badgeStatus" | "errorMsg" | "preValidation" | "apiEndPoint" | "extracted";
-type registetInput = {
+
+export type toggleKey = "tagCollect" | "tagFiltering";
+export type selectKey = "language" | "siteType" | "nextPageType";
+export type textKey = "name" | "rootUrl" | "entryUrl" | "last" | "next" | "parameter" | "url" | "links" | "multiple" | "tags" | "lastPageNumberRegExp" | "articleTagSelector" | "articleTitleSelector" | "articleBodySelector";
+export type siteKeys = toggleKey | selectKey | textKey;
+
+export type ValueTypes = "value" | "badgeStatus" | "errorMsg";
+export interface SubObject {
+	label: string;
 	input: {
 		method: string;
-		defaultValue: null | boolean;
-		choices: null | string[] | boolean[];
+		defaultValue: null | string | boolean;
+		choices?: string[] | boolean[];
 	};
-};
-export type registerValue = {
-	[key in registerKeys]: string | string[] | boolean | null;
-} & registetInput;
+	value: string | boolean | null;
+	badgeStatus?: string | null;
+	errorMsg?: string | null;
+	preValidation?: string | null;
+	apiEndPoint?: string | null;
+	extracted?: string | null;
+	child?: {
+		[key: string]: SubObject;
+	};
+}
 
-export type registerObj = {
-	[key in siteKeys]: registerValue;
+export interface RegisterObj {
+	[key: string]: SubObject;
 };
-/*
-export type inputValues = {
-	[key: string]: string | boolean;
-}[];
-*/
 
-export type inputValues = {
-	value?: string | boolean | null;
-	errorMsg?: string;
+export type updateValues = {
+	value?: string | boolean;
 	badgeStatus?: string;
+	errorMsg?: string;
 }[];
-
-export type textInputKeys = Extract<
-	siteKeys,
-	| "name"
-	| "rootUrl"
-	| "entryUrl"
-	| "lastUrlSelector"
-	| "lastPageNumberRegExp"
-	| "nextPageParameter"
-	| "nextPageLinkSelector"
-	| "nextPageUrlRegExp"
-	| "tags"
-	| "indexLinkSelector"
-	| "articleBlockSelector"
-	| "articleTitleSelector"
-	| "articleBodySelector"
-	| "articleTagSelector"
->;

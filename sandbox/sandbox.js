@@ -48,11 +48,6 @@ const registerObj = {
 		label: "Target site language JP or EN",
 		input: { method: "select", defaultValue: null, choices: ["JP", "EN"] },
 		value: null,
-		badgeStatus: null,
-		errorMsg: null,
-		preValidation: null,
-		apiEndPoint: null,
-		extracted: null,
 	},
 
 	siteType: {
@@ -63,13 +58,8 @@ const registerObj = {
 			choices: ["links", "single", "multiple"],
 		},
 		value: null,
-		badgeStatus: null,
-		errorMsg: null,
-		preValidation: null,
-		apiEndPoint: null,
-		extracted: null,
 		child: {
-			indexLinkSelector: {
+			links: {
 				label: "CSS link selector for links on the index page.",
 				input: {
 					method: "text",
@@ -83,7 +73,7 @@ const registerObj = {
 				apiEndPoint: "/indexlinks",
 				extracted: null,
 			},
-			articleBlockSelector: {
+			multiple: {
 				label: "CSS selector for article blocks",
 				input: {
 					method: "text",
@@ -107,11 +97,6 @@ const registerObj = {
 			choices: ["last", "parameter", "url", "next", "pagenation"],
 		},
 		value: null,
-		badgeStatus: null,
-		errorMsg: null,
-		preValidation: null,
-		apiEndPoint: null,
-		extracted: null,
 		child: {
 			last: {
 				label: "CSS link selector of last URL",
@@ -198,11 +183,6 @@ const registerObj = {
 			choices: [true, false],
 		},
 		value: false,
-		badgeStatus: null,
-		errorMsg: null,
-		preValidation: null,
-		apiEndPoint: null,
-		extracted: null,
 		child: {
 			tags: {
 				label: "Provide tags for tag filtering.",
@@ -228,11 +208,6 @@ const registerObj = {
 			choices: [true, false],
 		},
 		value: false,
-		badgeStatus: null,
-		errorMsg: null,
-		preValidation: null,
-		apiEndPoint: null,
-		extracted: null,
 		child: {
 			articleTagSelector: {
 				label: "CSS selector for article tags",
@@ -280,14 +255,30 @@ const registerObj = {
 	},
 };
 
-const updateObj = (obj, key, fieldName, value) => {
-	obj[key][fieldName] = value;
-	return obj;
-};
+function update(siteKey, updateObj, obj) {
+
+	for (const key in obj) {
+		if (key === siteKey) {
+				for (const uObj of updateObj) {
+					obj[key] = { ...obj[key], ...uObj };
+				}
+			}
+
+			if (Object.hasOwn(obj[key], "child")) {
+				update(siteKey, updateObj, obj[key].child);
+			}
+		}
+
+		return obj;
+	}
+
+const updated = update("last", [{ "value": "updated!" }], registerObj);
+console.table(updated.nextPageType.child);
+
 
 const showFields = (registerObj) => {
 	for (const [k, v] of Object.entries(registerObj)) {
-		console.log(k, v.value);
+				console.log(k, v.value);
 
 		if (Object.hasOwn(v, "child")) {
 			if (v.input.method === "select" && v.value !== null) {
@@ -301,7 +292,3 @@ const showFields = (registerObj) => {
 		}
 	}
 };
-
-//console.log(registerObj.nextPageType.child.last);
-const uO = updateObj(registerObj, "nextPageType", "value", "last");
-showFields(uO);

@@ -56,7 +56,7 @@ export interface site {
 	/** optional: Tags ----------------------------- */
 
 	//if tagFiltering is true.  Tags used to filter the articles
-	tags?: string[];
+	tags: string[];
 
 	//if tagFiltering is true OR tagCollection is true | CSS selector for the tags
 	articleTagSelector?: string;
