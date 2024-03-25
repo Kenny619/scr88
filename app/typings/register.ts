@@ -15,7 +15,7 @@ export interface SubObject {
 	value: string | boolean | null;
 	badgeStatus?: string | null;
 	errorMsg?: string | null;
-	preValidation?: string | null;
+	preValidation?: string[] | null;
 	apiEndPoint?: string | null;
 	extracted?: string | null;
 	child?: {

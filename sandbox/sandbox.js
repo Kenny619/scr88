@@ -273,7 +273,7 @@ function update(siteKey, updateObj, obj) {
 	}
 
 const updated = update("last", [{ "value": "updated!" }], registerObj);
-console.table(updated.nextPageType.child);
+console.table(updated);
 
 
 const showFields = (registerObj) => {

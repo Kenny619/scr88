@@ -11,6 +11,7 @@ const UpdaterContext = createContext((siteKey: string, values: updateValues): vo
 export default function InputTable() {
 	const [registerObj, setRegisterObj] = useState(_registerObj);
 
+	//useState fn wrapper
 	function updateRegisterObj(siteKey: string, keyValArr: updateValues): void {
 		const obj = updateObj(siteKey, keyValArr, registerObj);
 		setRegisterObj(obj);
@@ -43,8 +44,6 @@ export default function InputTable() {
 }
 
 function TableRow({ siteKey, params }: { siteKey: string; params: SubObject }): JSX.Element {
-	const inputRef = useContext(InputContext);
-
 	return (
 		<Table.Row key={siteKey}>
 			<Table.Cell>
