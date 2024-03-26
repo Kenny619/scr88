@@ -1,5 +1,6 @@
 import type { RegisterObj, updateValues } from "../../typings/index";
 import v from "validator";
+import { assertDefined } from "./tshelper";
 type valRef = {
 	[key: string]: {
 		pre: Array<() => string>;
@@ -33,12 +34,17 @@ export default function validateInput(
 	const postVal =
 		siteKey === "lastPageNumberRegExp" || siteKey === "nextPageUrlRegExp" ? value.replace(/\\/g, "\\\\") : value;
 
-	if (Object.hasOwn(inputs[siteKey], "ep")) {
-		apiRequest(inputs[siteKey].apiEndPoint!, siteKey, postVal, updater);
-	}
+	const ep = inputs[siteKey].apiEndPoint;
+	assertDefined(ep);
+	apiRequest(ep, siteKey, postVal, updater);
 }
 
-function apiRequest(endpoint: string, key: string, value: string, updater: (siteKey: string, values: updateValues) => void) {
+function apiRequest(
+	endpoint: string,
+	key: string,
+	value: string,
+	updater: (siteKey: string, values: updateValues) => void,
+) {
 	const postData = {
 		key: key,
 		input: value,
@@ -89,7 +95,9 @@ function preValidation(inputs: RegisterObj, siteKey: string, value: string): str
 		},
 	};
 
-	const err = inputs[siteKey].preValidation!
+	const preValArr = inputs[siteKey].preValidation;
+	assertDefined(preValArr);
+	const err = preValArr
 		.map((key) => conds[key]())
 		.filter((v) => v.length > 0)
 		.join("<br/>\r\n");

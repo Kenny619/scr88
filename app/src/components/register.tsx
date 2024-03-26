@@ -3,7 +3,6 @@ import { createContext, useContext, useState } from "react";
 import type { RegisterObj, siteKeys, updateValues, SubObject } from "../../typings/index";
 import { rObj as _registerObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
-import { ok } from "assert";
 
 const InputContext = createContext(_registerObj);
 const UpdaterContext = createContext((siteKey: string, values: updateValues): void => {});
@@ -75,7 +74,12 @@ function TextInputs({ siteKey }: { siteKey: string }): JSX.Element {
 	return (
 		<Flex gap={"2"} p={"2"}>
 			<TextField.Root>
-				<TextField.Input id={siteKey} name={siteKey} onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)} autoComplete={siteKey} />
+				<TextField.Input
+					id={siteKey}
+					name={siteKey}
+					onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)}
+					autoComplete={siteKey}
+				/>
 			</TextField.Root>
 		</Flex>
 	);
@@ -89,7 +93,14 @@ function ToggleInputs({ siteKey }: { siteKey: string }): JSX.Element {
 
 	return (
 		<Flex gap="2" p="2">
-			<Switch className="CheckboxRoot" checked={checkStatus as boolean} id={siteKey} onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])} size={"2"} radius="none" />
+			<Switch
+				className="CheckboxRoot"
+				checked={checkStatus as boolean}
+				id={siteKey}
+				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])}
+				size={"2"}
+				radius="none"
+			/>
 		</Flex>
 	);
 }
@@ -165,14 +176,20 @@ function objToRender(obj: RegisterObj) {
 		while (Object.hasOwn(params, "child")) {
 			if (params.input.method === "select" && params.value !== null) {
 				const siteKey = params.value as string;
-				output[siteKey] = params.child![siteKey];
-				params = output[siteKey];
+				const c = params.child;
+				if (c) {
+					output[siteKey] = c[siteKey];
+					params = c[siteKey];
+				}
 			}
 
 			if ((params.input.method === "toggle" && params.value === true) || params.input.method === "text") {
-				const siteKey = Object.keys(params.child!)[0];
-				output[siteKey] = params.child![siteKey];
-				params = output[siteKey];
+				const c = params.child;
+				if (c) {
+					const siteKey = Object.keys(c)[0];
+					output[siteKey] = c[siteKey];
+					params = c[siteKey];
+				}
 			}
 		}
 	}
@@ -187,8 +204,9 @@ function updateObj(siteKey: string, keyValArr: updateValues, obj: RegisterObj): 
 			}
 		}
 
-		if (Object.hasOwn(obj[key], "child")) {
-			updateObj(siteKey, keyValArr, obj[key].child!);
+		const c = obj[key].child;
+		if (c) {
+			updateObj(siteKey, keyValArr, c);
 		}
 	}
 
