@@ -256,29 +256,24 @@ const registerObj = {
 };
 
 function update(siteKey, updateObj, obj) {
-
 	for (const key in obj) {
 		if (key === siteKey) {
-				for (const uObj of updateObj) {
-					obj[key] = { ...obj[key], ...uObj };
-				}
-			}
-
-			if (Object.hasOwn(obj[key], "child")) {
-				update(siteKey, updateObj, obj[key].child);
+			for (const uObj of updateObj) {
+				obj[key] = { ...obj[key], ...uObj };
 			}
 		}
 
-		return obj;
+		if (Object.hasOwn(obj[key], "child")) {
+			update(siteKey, updateObj, obj[key].child);
+		}
 	}
 
-const updated = update("last", [{ "value": "updated!" }], registerObj);
-console.table(updated);
-
+	return obj;
+}
 
 const showFields = (registerObj) => {
 	for (const [k, v] of Object.entries(registerObj)) {
-				console.log(k, v.value);
+		console.log(k, v.value);
 
 		if (Object.hasOwn(v, "child")) {
 			if (v.input.method === "select" && v.value !== null) {
@@ -292,3 +287,32 @@ const showFields = (registerObj) => {
 		}
 	}
 };
+
+const showNewObj = (registerObj, output = {}) => {
+	for (const [k, v] of Object.entries(registerObj)) {
+		output[k] = v;
+
+		if (Object.hasOwn(v, "child")) {
+			if (v.input.method === "select" && v.value !== null) {
+				const o = {};
+				o[v.value] = v.child[v.value];
+				showNewObj(o, output);
+			}
+
+			if ((v.input.method === "toggle" && v.value === true) || (v.input.method === "text" && v.value !== null)) {
+				showNewObj(v.child, output);
+			}
+		}
+	}
+	return output;
+};
+
+const first = update("tagCollect", [{ value: true }], registerObj);
+const updated = update("articleTagSelector", [{ value: "updated!" }], first);
+
+const second = update("nextPageType", [{ value: "last" }], updated);
+const third = update("last", [{ value: "this is the last url" }], updated);
+const updatedd = update("lastPageNumberRegExp", [{ value: "this is also updated!" }, third]);
+
+console.dir(showNewObj(third));
+//showFields(updated);

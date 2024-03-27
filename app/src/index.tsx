@@ -4,6 +4,7 @@ import "./index.css";
 //import "./styles.css";
 import reportWebVitals from "./reportWebVitals";
 import InputTable from "./components/register";
+//import App from "./App";
 import "@radix-ui/themes/styles.css";
 import { Theme } from "@radix-ui/themes";
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);

@@ -1,8 +1,9 @@
 import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-ui/themes";
 import { createContext, useContext, useState } from "react";
-import type { RegisterObj, siteKeys, updateValues, SubObject } from "../../typings/index";
+import type { RegisterObj, updateValues, SubObject } from "../../typings/index";
 import { rObj as _registerObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
+import { assertDef } from "../utils/tshelper";
 
 const InputContext = createContext(_registerObj);
 const UpdaterContext = createContext((siteKey: string, values: updateValues): void => {});
@@ -12,13 +13,15 @@ export default function InputTable() {
 
 	//useState fn wrapper
 	function updateRegisterObj(siteKey: string, keyValArr: updateValues): void {
-		const obj = updateObj(siteKey, keyValArr, registerObj);
+		const obj = updateObj(siteKey, keyValArr, { ...registerObj });
+		console.count("updateRegisterObj");
 		setRegisterObj(obj);
 	}
 
 	//Create a flat OoO that only contains rendering objects
-	const renderObj: { [key: string]: SubObject } = objToRender(registerObj);
-
+	const renderObj: { [key: string]: SubObject } = flatRenderingObj(registerObj);
+	console.table(renderObj);
+	//	isRegisterable(registerObj) && console.log("Ready to save the registration.");
 	return (
 		<Table.Root>
 			<Table.Header>
@@ -74,12 +77,7 @@ function TextInputs({ siteKey }: { siteKey: string }): JSX.Element {
 	return (
 		<Flex gap={"2"} p={"2"}>
 			<TextField.Root>
-				<TextField.Input
-					id={siteKey}
-					name={siteKey}
-					onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)}
-					autoComplete={siteKey}
-				/>
+				<TextField.Input id={siteKey} name={siteKey} onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)} autoComplete={siteKey} />
 			</TextField.Root>
 		</Flex>
 	);
@@ -129,67 +127,63 @@ function SelectInput({ siteKey }: { siteKey: string }): JSX.Element {
 
 function ErrorMsg({ siteKey }: { siteKey: string }): JSX.Element {
 	const inputRef = useContext(InputContext);
-	const siteKeyRef = inputRef[siteKey];
-	/** create statusBadge */
-	let errorMsg: JSX.Element = <></>;
-	if (siteKeyRef && Object.hasOwn(siteKeyRef, "errorMsg")) {
-		errorMsg = (
-			<Text as="div" size={"1"} color="tomato">
-				{siteKeyRef.errorMsg}
-			</Text>
-		);
+
+	if (!Object.hasOwn(inputRef, "errorMsg") || inputRef[siteKey].errorMsg === null) {
+		return <></>;
 	}
-	return errorMsg;
+
+	/** create statusBadge */
+	return (
+		<Text as="div" size={"1"} color="tomato">
+			{inputRef[siteKey].errorMsg}
+		</Text>
+	);
 }
 
 function StatusBadge({ siteKey }: { siteKey: string }): JSX.Element {
 	const inputRef = useContext(InputContext);
-	/** create statusBadge */
-	let statusBadge: JSX.Element = <></>;
-	if (inputRef[siteKey].badgeStatus !== null) {
-		let color: "gray" | "green" | "tomato" = "gray";
-		switch (inputRef[siteKey].badgeStatus) {
-			case "Pending Input":
-				color = "gray";
-				break;
-			case "Pass":
-				color = "green";
-				break;
-			case "Fail":
-				color = "tomato";
-				break;
-		}
-		statusBadge = (
-			<Badge color={color} size={"2"}>
-				{inputRef[siteKey].badgeStatus}
-			</Badge>
-		);
+
+	if (!Object.hasOwn(inputRef[siteKey], "badgeStatus")) {
+		return <></>;
 	}
-	return statusBadge;
+
+	/** create statusBadge */
+	let color: "gray" | "green" | "tomato" = "gray";
+	switch (inputRef[siteKey].badgeStatus) {
+		case "Pending Input":
+			color = "gray";
+			break;
+		case "Pass":
+			color = "green";
+			break;
+		case "Fail":
+			color = "tomato";
+			break;
+	}
+
+	return (
+		<Badge color={color} size={"2"}>
+			{inputRef[siteKey].badgeStatus}
+		</Badge>
+	);
 }
 
-function objToRender(obj: RegisterObj) {
-	const output: { [key: string]: SubObject } = {};
-	for (const [oKey, oVal] of Object.entries(obj)) {
-		output[oKey] = oVal;
-		let params = oVal;
-		while (Object.hasOwn(params, "child")) {
-			if (params.input.method === "select" && params.value !== null) {
-				const siteKey = params.value as string;
-				const c = params.child;
-				if (c) {
-					output[siteKey] = c[siteKey];
-					params = c[siteKey];
-				}
+function flatRenderingObj(obj: RegisterObj, output: RegisterObj = {}) {
+	for (const [k, v] of Object.entries(obj)) {
+		output[k] = v;
+
+		if (Object.hasOwn(v, "child")) {
+			const child = assertDef(v.child);
+			//case select
+			if (v.input.method === "select" && v.value !== null && typeof v.value === "string") {
+				const o: { [key: string]: SubObject } = {};
+				o[v.value] = child[v.value];
+				flatRenderingObj(o, output);
 			}
 
-			if ((params.input.method === "toggle" && params.value === true) || params.input.method === "text") {
-				const c = params.child;
-				if (c) {
-					const siteKey = Object.keys(c)[0];
-					output[siteKey] = c[siteKey];
-					params = c[siteKey];
-				}
+			//case toggle and text
+			if ((v.input.method === "toggle" && v.value === true) || (v.input.method === "text" && v.value !== null)) {
+				flatRenderingObj(child, output);
 			}
 		}
 	}
@@ -199,16 +193,58 @@ function objToRender(obj: RegisterObj) {
 function updateObj(siteKey: string, keyValArr: updateValues, obj: RegisterObj): RegisterObj {
 	for (const key in obj) {
 		if (key === siteKey) {
-			for (const uObj of keyValArr) {
-				obj[key] = { ...obj[key], ...uObj };
+			for (const kv of keyValArr) {
+				obj[key] = { ...obj[key], ...kv };
 			}
 		}
 
-		const c = obj[key].child;
-		if (c) {
-			updateObj(siteKey, keyValArr, c);
+		if (Object.hasOwn(obj[key], "child")) {
+			//check for child property.  Recur update its child
+			const child = assertDef(obj[key].child);
+			updateObj(siteKey, keyValArr, child);
+		}
+	}
+	return obj;
+}
+
+function isRegisterable(registerObj: RegisterObj): boolean {
+	for (const val of Object.values(registerObj)) {
+		//exit conditions
+		if ((val.input.method === "text" && val.badgeStatus !== "Pass") || (val.input.method === "select" && val.value === null)) {
+			return false;
+		}
+
+		if (Object.hasOwn(val, "child")) {
+			//child check conditions
+			if (val.input.method === "select" && val.value !== null) {
+				const childObj = assertDef(val.child);
+				for (const key in childObj) {
+					if (key === val.value) {
+						isRegisterable({ key: childObj[key] });
+					}
+				}
+			}
+
+			if ((val.input.method === "toggle" && val.value === true) || (val.input.method === "text" && val.badgeStatus === "Pass")) {
+				const child = assertDef(val.child);
+				isRegisterable(child);
+			}
 		}
 	}
 
-	return obj;
+	return true;
 }
+
+function registerHasProp(registerObj: RegisterObj, siteKey: string, propName: string) {
+	for (const [k, v] of Object.entries(registerObj)) {
+		if (k === siteKey) {
+			return Object.hasOwn(registerObj[k], propName) ? true : false;
+		}
+
+		if (Object.hasOwn(registerObj[k], "child")) {
+			const child = assertDef(registerObj[k].child);
+		}
+	}
+}
+
+function isRegisterPropValue(registerObj: RegisterObj, siteKey: string, propName: string, value: null | string | boolean | string[] | boolean[]) {}
