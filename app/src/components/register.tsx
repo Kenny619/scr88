@@ -13,13 +13,13 @@ export default function InputTable() {
 
 	//useState fn wrapper
 	function updateRegisterObj(siteKey: string, keyValArr: updateValues): void {
-		const obj = updateObj(siteKey, keyValArr, { ...registerObj });
+		const obj = registerUpdate(registerObj, siteKey, keyValArr);
 		console.count("updateRegisterObj");
 		setRegisterObj(obj);
 	}
 
 	//Create a flat OoO that only contains rendering objects
-	const renderObj: { [key: string]: SubObject } = flatRenderingObj(registerObj);
+	const renderObj: { [key: string]: SubObject } = registerFlat(registerObj);
 	console.table(renderObj);
 	//	isRegisterable(registerObj) && console.log("Ready to save the registration.");
 	return (
@@ -60,13 +60,13 @@ function TableRow({ siteKey, params }: { siteKey: string; params: SubObject }): 
 				{params.input.method === "text" && <TextInputs siteKey={siteKey} />}
 				{params.input.method === "toggle" && <ToggleInputs siteKey={siteKey} />}
 				{params.input.method === "select" && <SelectInput siteKey={siteKey} />}
-				<Flex>
-					<ErrorMsg siteKey={siteKey} />
-				</Flex>
+				{Object.hasOwn(params, "errorMsg") && (
+					<Flex>
+						<ErrorMsg errorMsg={params.errorMsg as string} />
+					</Flex>
+				)}
 			</Table.Cell>
-			<Table.Cell>
-				<StatusBadge siteKey={siteKey} />
-			</Table.Cell>
+			<Table.Cell>{Object.hasOwn(params, "badgeStatus") && <StatusBadge badgeStatus={params.badgeStatus as string} />}</Table.Cell>
 		</Table.Row>
 	);
 }
@@ -91,14 +91,7 @@ function ToggleInputs({ siteKey }: { siteKey: string }): JSX.Element {
 
 	return (
 		<Flex gap="2" p="2">
-			<Switch
-				className="CheckboxRoot"
-				checked={checkStatus as boolean}
-				id={siteKey}
-				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])}
-				size={"2"}
-				radius="none"
-			/>
+			<Switch className="CheckboxRoot" checked={checkStatus as boolean} id={siteKey} onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])} size={"2"} radius="none" />
 		</Flex>
 	);
 }
@@ -125,31 +118,18 @@ function SelectInput({ siteKey }: { siteKey: string }): JSX.Element {
 	);
 }
 
-function ErrorMsg({ siteKey }: { siteKey: string }): JSX.Element {
-	const inputRef = useContext(InputContext);
-
-	if (!Object.hasOwn(inputRef, "errorMsg") || inputRef[siteKey].errorMsg === null) {
-		return <></>;
-	}
-
-	/** create statusBadge */
+function ErrorMsg({ errorMsg }: { errorMsg: string }): JSX.Element {
 	return (
 		<Text as="div" size={"1"} color="tomato">
-			{inputRef[siteKey].errorMsg}
+			{errorMsg}
 		</Text>
 	);
 }
 
-function StatusBadge({ siteKey }: { siteKey: string }): JSX.Element {
-	const inputRef = useContext(InputContext);
-
-	if (!Object.hasOwn(inputRef[siteKey], "badgeStatus")) {
-		return <></>;
-	}
-
+function StatusBadge({ badgeStatus }: { badgeStatus: string }): JSX.Element {
 	/** create statusBadge */
 	let color: "gray" | "green" | "tomato" = "gray";
-	switch (inputRef[siteKey].badgeStatus) {
+	switch (badgeStatus) {
 		case "Pending Input":
 			color = "gray";
 			break;
@@ -163,34 +143,33 @@ function StatusBadge({ siteKey }: { siteKey: string }): JSX.Element {
 
 	return (
 		<Badge color={color} size={"2"}>
-			{inputRef[siteKey].badgeStatus}
+			{badgeStatus}
 		</Badge>
 	);
 }
 
-function flatRenderingObj(obj: RegisterObj, output: RegisterObj = {}) {
+function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
 	for (const [k, v] of Object.entries(obj)) {
 		output[k] = v;
 
-		if (Object.hasOwn(v, "child")) {
-			const child = assertDef(v.child);
-			//case select
-			if (v.input.method === "select" && v.value !== null && typeof v.value === "string") {
-				const o: { [key: string]: SubObject } = {};
-				o[v.value] = child[v.value];
-				flatRenderingObj(o, output);
-			}
+		if (!("child" in v)) {
+			continue;
+		}
 
-			//case toggle and text
-			if ((v.input.method === "toggle" && v.value === true) || (v.input.method === "text" && v.value !== null)) {
-				flatRenderingObj(child, output);
-			}
+		if (v.input.method === "select" && v.value !== null) {
+			const child = extractChild(v, "select");
+			child && registerFlat(child, output);
+		}
+
+		if ((v.input.method === "toggle" && v.value === true) || (v.input.method === "text" && v.value !== null)) {
+			const child = extractChild(v);
+			child && registerFlat(child, output);
 		}
 	}
 	return output;
 }
 
-function updateObj(siteKey: string, keyValArr: updateValues, obj: RegisterObj): RegisterObj {
+function registerUpdate(obj: RegisterObj, siteKey: string, keyValArr: updateValues): RegisterObj {
 	for (const key in obj) {
 		if (key === siteKey) {
 			for (const kv of keyValArr) {
@@ -198,10 +177,11 @@ function updateObj(siteKey: string, keyValArr: updateValues, obj: RegisterObj): 
 			}
 		}
 
-		const child = extractChild(obj[key]);
-		child && updateObj(siteKey, keyValArr, child);
+		const child = extractChild(obj[key], "select");
+		child && registerUpdate(child, siteKey, keyValArr);
 	}
-	return obj;
+
+	return { ...obj };
 }
 
 function isRegisterable(registerObj: RegisterObj): boolean {
@@ -238,15 +218,9 @@ function isRegisterable(registerObj: RegisterObj): boolean {
 //Extract subObject that matches propName:value conditions -> return subObject[]
 //check if registerObj fullfils a given condition -> return boolean
 
+//type SubObject = { [key: string]: string | boolean | null | boolean[] | string[] }[];
 type registerFind = (obj: SubObject, propName: string) => string | boolean | null;
-type registerUpdate = (obj: SubObject, keyValArr: { [key: string]: string | boolean | null }[]) => SubObject;
-type propName = string; //Partial<keyof SubObject>;
-type keyValArr = { [key: string]: string | boolean }[];
-type Arg = propName | keyValArr;
-type fn<T> = T extends propName ? registerFind : registerUpdate;
-function registerFn(obj: RegisterObj, siteKey: string, arg: propName, fn: registerFind): boolean | string | null;
-function registerFn(obj: RegisterObj, siteKey: string, arg: keyValArr, fn: registerUpdate): SubObject;
-function registerFn(obj: RegisterObj, siteKey: string, arg: propName | keyValArr, fn: registerFind | registerUpdate) {
+function registerFn(obj: RegisterObj, siteKey: string, arg: string, fn: registerFind) {
 	for (const [k, v] of Object.entries(obj)) {
 		if (k === siteKey) {
 			return fn(v, arg);
@@ -265,26 +239,21 @@ function getValue(obj: SubObject, propName: string) {
 	return Object.hasOwn(obj, propName) ? obj[propName as keyof SubObject] : null;
 }
 
-function update(obj: SubObject, keyValArr: { [key: string]: string | boolean }[]) {
-	let updated = obj;
-	for (const kv of keyValArr) {
-		updated = { ...updated, ...kv };
-	}
-	return updated;
-}
-
-function extractChild(obj: SubObject, selectValue = ""): null | RegisterObj {
+function extractChild(obj: SubObject, mode = ""): null | RegisterObj {
 	if (!("child" in obj)) {
 		return null;
 	}
 
 	const child = assertDef(obj.child);
 
-	if (obj.input.method === "select" && obj.value !== null && selectValue) {
+	//only when input method is select and the mode="select" return subObject whose key is the selected value e.g. obj.value
+	if (obj.input.method === "select" && obj.value !== null && mode) {
+		const selected = obj.value as string;
 		const o: { [key: string]: SubObject } = {};
-		o[selectValue] = child[selectValue];
+		o[selected] = child[selected];
 		return o;
 	}
 
+	//otherwise return the subobject under child property
 	return child;
 }
