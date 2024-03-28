@@ -198,11 +198,8 @@ function updateObj(siteKey: string, keyValArr: updateValues, obj: RegisterObj): 
 			}
 		}
 
-		if (Object.hasOwn(obj[key], "child")) {
-			//check for child property.  Recur update its child
-			const child = assertDef(obj[key].child);
-			updateObj(siteKey, keyValArr, child);
-		}
+		const child = extractChild(obj[key]);
+		child && updateObj(siteKey, keyValArr, child);
 	}
 	return obj;
 }
@@ -235,16 +232,59 @@ function isRegisterable(registerObj: RegisterObj): boolean {
 	return true;
 }
 
-function registerHasProp(registerObj: RegisterObj, siteKey: string, propName: string) {
-	for (const [k, v] of Object.entries(registerObj)) {
+//find the value of a given key and a propName -> return value
+//check if a give key holds a given propName -> return booelan
+//change the propName:value under given key -> return registerObj
+//Extract subObject that matches propName:value conditions -> return subObject[]
+//check if registerObj fullfils a given condition -> return boolean
+
+type registerFind = (obj: SubObject, propName: string) => string | boolean | null;
+type registerUpdate = (obj: SubObject, keyValArr: { [key: string]: string | boolean | null }[]) => SubObject;
+type propName = string; //Partial<keyof SubObject>;
+type keyValArr = { [key: string]: string | boolean }[];
+type Arg = propName | keyValArr;
+type fn<T> = T extends propName ? registerFind : registerUpdate;
+function registerFn(obj: RegisterObj, siteKey: string, arg: propName, fn: registerFind): boolean | string | null;
+function registerFn(obj: RegisterObj, siteKey: string, arg: keyValArr, fn: registerUpdate): SubObject;
+function registerFn(obj: RegisterObj, siteKey: string, arg: propName | keyValArr, fn: registerFind | registerUpdate) {
+	for (const [k, v] of Object.entries(obj)) {
 		if (k === siteKey) {
-			return Object.hasOwn(registerObj[k], propName) ? true : false;
+			return fn(v, arg);
 		}
 
-		if (Object.hasOwn(registerObj[k], "child")) {
-			const child = assertDef(registerObj[k].child);
-		}
+		const child = extractChild(v);
+		child && registerFn(child, siteKey, arg, fn);
 	}
 }
 
-function isRegisterPropValue(registerObj: RegisterObj, siteKey: string, propName: string, value: null | string | boolean | string[] | boolean[]) {}
+function hasProp(obj: SubObject, propName: string) {
+	return Object.hasOwn(obj, propName) ? true : false;
+}
+
+function getValue(obj: SubObject, propName: string) {
+	return Object.hasOwn(obj, propName) ? obj[propName as keyof SubObject] : null;
+}
+
+function update(obj: SubObject, keyValArr: { [key: string]: string | boolean }[]) {
+	let updated = obj;
+	for (const kv of keyValArr) {
+		updated = { ...updated, ...kv };
+	}
+	return updated;
+}
+
+function extractChild(obj: SubObject, selectValue = ""): null | RegisterObj {
+	if (!("child" in obj)) {
+		return null;
+	}
+
+	const child = assertDef(obj.child);
+
+	if (obj.input.method === "select" && obj.value !== null && selectValue) {
+		const o: { [key: string]: SubObject } = {};
+		o[selectValue] = child[selectValue];
+		return o;
+	}
+
+	return child;
+}
