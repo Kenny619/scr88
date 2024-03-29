@@ -7,7 +7,7 @@
 		"test": "vitest",
 		"prebuild": "rimraf dist",
 		"build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
-		"postbuild": "node ./dist/api/index.js"
+		"postbuild": "node --env-file=.env ./dist/api/index.js"
 	},
 	"type": "module",
 	"repository": {

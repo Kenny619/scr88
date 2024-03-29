@@ -6,7 +6,6 @@ import express from "express";
 //import RedisStore from "connect-redis";
 import * as val from "../utils/registerServices.js";
 import { getSerializedDOM } from "../utils/registerHelper.js";
-
 declare module "express-session" {
 	interface SessionData {
 		entryUrl?: string;
@@ -16,7 +15,6 @@ declare module "express-session" {
 		lastUrl?: string;
 	}
 }
-
 //const app = express();
 const register = express.Router();
 /*
@@ -42,6 +40,11 @@ async function generateDOM(session: Express.Request["session"]) {
 		session.articleDOM = await getSerializedDOM(session.articleUrl);
 	}
 }
+
+register.post("/name", async (req, res) => {
+	const vresult = await val.name(req.body.name);
+	res.send(vresult);
+});
 
 register.post("/url", async (req, res) => {
 	const vresult = await val.url(req.body.input);
@@ -73,26 +76,18 @@ register.post("/lasturlregex", (req, res) => {
 });
 
 register.post("/parameter", async (req, res) => {
-	req.session.entryUrl
-		? res.send(await val.parameter(req.body.parameter, req.session.entryUrl))
-		: res.send({ pass: false, errMsg: "entryUrl input required" });
+	req.session.entryUrl ? res.send(await val.parameter(req.body.parameter, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
 });
 
 register.post("/pagenuminurl", async (req, res) => {
-	req.session.entryUrl
-		? res.send(await val.pageNumInUrl(req.body.regex, req.session.entryUrl))
-		: res.send({ pass: false, errMsg: "entryUrl input required" });
+	req.session.entryUrl ? res.send(await val.pageNumInUrl(req.body.regex, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
 });
 
 register.post("/nexturlregex", async (req, res) => {
-	req.session.entryUrl
-		? res.send(await val.regex(req.body.regex, req.session.entryUrl))
-		: res.send({ pass: false, errMsg: "entryUrl input required" });
+	req.session.entryUrl ? res.send(await val.regex(req.body.regex, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
 });
 register.post("/nexturl", async (req, res) => {
-	req.session.entryUrl
-		? res.send(await val.link(req.body.input, req.session.entryUrl))
-		: res.send({ pass: false, errMsg: "entryUrl input required" });
+	req.session.entryUrl ? res.send(await val.link(req.body.input, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
 });
 
 register.post("/lasturl", async (req: express.Request, res: express.Response) => {

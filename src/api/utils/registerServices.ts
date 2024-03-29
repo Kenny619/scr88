@@ -1,14 +1,28 @@
 import { isURLalive, extract, extractAll } from "./registerHelper.js";
 import val from "validator";
-
+import mysql from "mysql2/promise";
 type valResult<T extends string | string[]> = { pass: true; result: T } | { pass: false; errMsg: string };
 
+//mysql connection
+const env = {
+	host: process.env.DB_HOST as string,
+	port: Number(process.env.DB_PORT),
+	user: process.env.DB_USER as string,
+	password: process.env.DB_PASSWORD as string,
+	database: "scr88",
+	namedPlaceholders: true,
+};
+const connection = await mysql.createConnection(env);
+
 //validateName
-export function name(name: string): valResult<string> {
-	return {
-		pass: true,
-		result: name,
-	};
+export async function name(name: string): Promise<valResult<string>> {
+	try {
+		const [result, field] = await connection.query("SELECT id FROM scrapers WHERE name = :name", { name: name });
+		console.log("result:", result, "field:", field);
+		return (result as []).length > 0 ? { pass: false, errMsg: "This name is already in use" } : { pass: true, result: "Valid name" };
+	} catch (e) {
+		return { pass: false, errMsg: e as string };
+	}
 }
 
 export async function url(url: string): Promise<valResult<string>> {

@@ -1,9 +1,9 @@
 import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-ui/themes";
 import { createContext, useContext, useState } from "react";
-import type { RegisterObj, updateValues, SubObject } from "../../typings/index";
+import type { updateValues, SubObject } from "../../typings/index";
 import { rObj as _registerObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
-import { assertDef } from "../utils/tshelper";
+import { registerFlat, registerUpdate, isRegisterable } from "../utils/register";
 
 const InputContext = createContext(_registerObj);
 const UpdaterContext = createContext((siteKey: string, values: updateValues): void => {});
@@ -21,7 +21,7 @@ export default function InputTable() {
 	//Create a flat OoO that only contains rendering objects
 	const renderObj: { [key: string]: SubObject } = registerFlat(registerObj);
 	console.table(renderObj);
-	//	isRegisterable(registerObj) && console.log("Ready to save the registration.");
+	console.log("isRegisterable: ", isRegisterable(registerObj));
 	return (
 		<Table.Root>
 			<Table.Header>
@@ -58,8 +58,8 @@ function TableRow({ siteKey, params }: { siteKey: string; params: SubObject }): 
 			</Table.Cell>
 			<Table.Cell>
 				{params.input.method === "text" && <TextInputs siteKey={siteKey} />}
-				{params.input.method === "toggle" && <ToggleInputs siteKey={siteKey} />}
-				{params.input.method === "select" && <SelectInput siteKey={siteKey} />}
+				{params.input.method === "toggle" && <ToggleInputs siteKey={siteKey} params={params} />}
+				{params.input.method === "select" && <SelectInput siteKey={siteKey} params={params} />}
 				{Object.hasOwn(params, "errorMsg") && (
 					<Flex>
 						<ErrorMsg errorMsg={params.errorMsg as string} />
@@ -73,32 +73,38 @@ function TableRow({ siteKey, params }: { siteKey: string; params: SubObject }): 
 
 function TextInputs({ siteKey }: { siteKey: string }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
-	const inputsRef = useContext(InputContext);
+	const registerObj = useContext(InputContext);
 	return (
 		<Flex gap={"2"} p={"2"}>
 			<TextField.Root>
-				<TextField.Input id={siteKey} name={siteKey} onBlur={(e) => validateInput(inputsRef, siteKey, e.target.value, updateInputs)} autoComplete={siteKey} />
+				<TextField.Input id={siteKey} name={siteKey} onBlur={(e) => validateInput(registerObj, siteKey, e.target.value, updateInputs)} autoComplete={siteKey} />
 			</TextField.Root>
 		</Flex>
 	);
 }
 
-function ToggleInputs({ siteKey }: { siteKey: string }): JSX.Element {
+function ToggleInputs({ siteKey, params }: { siteKey: string; params: SubObject }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
-	const inputRef = useContext(InputContext);
 
-	const checkStatus = inputRef[siteKey].value;
+	const checkStatus = params.value;
 
 	return (
 		<Flex gap="2" p="2">
-			<Switch className="CheckboxRoot" checked={checkStatus as boolean} id={siteKey} onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])} size={"2"} radius="none" />
+			<Switch
+				className="CheckboxRoot"
+				checked={checkStatus as boolean}
+				id={siteKey}
+				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])}
+				size={"2"}
+				radius="none"
+			/>
 		</Flex>
 	);
 }
-function SelectInput({ siteKey }: { siteKey: string }): JSX.Element {
+
+function SelectInput({ siteKey, params }: { siteKey: string; params: SubObject }): JSX.Element {
 	const updateInputs = useContext(UpdaterContext);
-	const inputRef = useContext(InputContext);
-	const choices = inputRef[siteKey].input.choices as string[];
+	const choices = params.input.choices as string[];
 	//radio button
 	return (
 		<RadioGroup.Root>
@@ -142,17 +148,24 @@ function StatusBadge({ badgeStatus }: { badgeStatus: string }): JSX.Element {
 	}
 
 	return (
-		<Badge color={color} size={"2"}>
-			{badgeStatus}
-		</Badge>
+		<Flex p={"2"} gap={"2"}>
+			<Badge color={color} size={"2"}>
+				{badgeStatus}
+			</Badge>
+		</Flex>
 	);
 }
 
+/*
 function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
 	for (const [k, v] of Object.entries(obj)) {
 		output[k] = v;
 
-		if (!("child" in v)) {
+		if (!Object.hasOwn(v, "child")) {
+			continue;
+		}
+
+		if (v.input.method === "select" && (v.value === "single" || v.value === "pagenation" || v.value === "daily" || v.value === "weekly" || v.value === "monthly")) {
 			continue;
 		}
 
@@ -191,34 +204,17 @@ function isRegisterable(registerObj: RegisterObj): boolean {
 			return false;
 		}
 
-		if (Object.hasOwn(val, "child")) {
-			//child check conditions
-			if (val.input.method === "select" && val.value !== null) {
-				const childObj = assertDef(val.child);
-				for (const key in childObj) {
-					if (key === val.value) {
-						isRegisterable({ key: childObj[key] });
-					}
-				}
-			}
-
-			if ((val.input.method === "toggle" && val.value === true) || (val.input.method === "text" && val.badgeStatus === "Pass")) {
-				const child = assertDef(val.child);
-				isRegisterable(child);
-			}
+		if (!Object.hasOwn(val, "child")) {
+			continue;
 		}
+
+		const child = extractChild(val);
+		child && isRegisterable(child);
 	}
 
 	return true;
 }
 
-//find the value of a given key and a propName -> return value
-//check if a give key holds a given propName -> return booelan
-//change the propName:value under given key -> return registerObj
-//Extract subObject that matches propName:value conditions -> return subObject[]
-//check if registerObj fullfils a given condition -> return boolean
-
-//type SubObject = { [key: string]: string | boolean | null | boolean[] | string[] }[];
 type registerFind = (obj: SubObject, propName: string) => string | boolean | null;
 function registerFn(obj: RegisterObj, siteKey: string, arg: string, fn: registerFind) {
 	for (const [k, v] of Object.entries(obj)) {
@@ -240,14 +236,20 @@ function getValue(obj: SubObject, propName: string) {
 }
 
 function extractChild(obj: SubObject, mode = ""): null | RegisterObj {
-	if (!("child" in obj)) {
+	if (!Object.hasOwn(obj, "child")) {
+		return null;
+	}
+
+	//single and pagenation do not have child property for additional input. return null and skip recurrsion.
+	if (obj.input.method === "select" && (obj.value === "single" || obj.value === "pagenation" || obj.value === "daily" || obj.value === "weekly" || obj.value === "monthly")) {
+		console.log("selected single or pagenation!");
 		return null;
 	}
 
 	const child = assertDef(obj.child);
-
-	//only when input method is select and the mode="select" return subObject whose key is the selected value e.g. obj.value
-	if (obj.input.method === "select" && obj.value !== null && mode) {
+	if (obj.input.method === "select" && mode && obj.value !== null) {
+		//only when input method is select and the mode="select" return su
+		//Object whose key is the selected value e.g. obj.value
 		const selected = obj.value as string;
 		const o: { [key: string]: SubObject } = {};
 		o[selected] = child[selected];
@@ -257,3 +259,4 @@ function extractChild(obj: SubObject, mode = ""): null | RegisterObj {
 	//otherwise return the subobject under child property
 	return child;
 }
+*/
