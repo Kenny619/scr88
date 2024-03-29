@@ -1,6 +1,6 @@
+import https from "node:https";
 import { JSDOM, ResourceLoader } from "jsdom";
 import userAgent from "./userAgents.js";
-import https from "https";
 
 type extractTypes = "link" | "text" | "node";
 

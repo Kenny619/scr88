@@ -1,4 +1,4 @@
-import type { RegisterObj, updateValues, SubObject } from "../../typings/index";
+import type { RegisterObj, SubObject, updateValues } from "../../typings/index";
 import { assertDef } from "../utils/tshelper";
 export function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
 	for (const [k, v] of Object.entries(obj)) {
@@ -59,8 +59,9 @@ export function isRegisterable(registerObj: RegisterObj): boolean {
 }
 
 type propNames = Exclude<keyof SubObject, "input" | "child">;
-type registerFind = (obj: SubObject, propName: propNames) => string | boolean | null | string[];
-export function registerFn(obj: RegisterObj, siteKey: string, arg: propNames, fn: registerFind): string | boolean | null | string[] {
+type registerFindreturn = string | string[] | boolean | null;
+type registerFind = (obj: SubObject, propName: propNames) => registerFindreturn;
+export function registerFn(obj: RegisterObj, siteKey: string, arg: propNames, fn: registerFind): registerFindreturn {
 	for (const [k, v] of Object.entries(obj)) {
 		if (k === siteKey) {
 			return fn(v, arg);
@@ -73,10 +74,9 @@ export function registerFn(obj: RegisterObj, siteKey: string, arg: propNames, fn
 }
 
 export const registerGetValue: registerFind = (obj, propName) => {
-	if (objectHasOwn(obj, propName)) {
-		const val = obj[propName];
+	if (Object.prototype.hasOwnProperty.call(obj, propName)) {
+		return obj[propName] as registerFindreturn;
 	}
-	function assertProp<T>(obj: object, k: T): Record<T, unknown>;
 	return null;
 };
 
