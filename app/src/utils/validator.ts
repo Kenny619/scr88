@@ -1,6 +1,5 @@
 import type { RegisterObj, updateValues } from "../../typings/index";
 import v from "validator";
-import { assertDefined } from "./tshelper";
 import { registerGetValue } from "./register";
 export default function validateInput(
 	registerObj: RegisterObj, //reference to the current status of the object
@@ -17,7 +16,6 @@ export default function validateInput(
 	//Change the badge status to Checking until the test result comes back
 	updater(siteKey, [{ badgeStatus: "Checking..." }, { errorMsg: "" }]);
 
-	console.log(`passing siteKey:${siteKey}  value:${value}`);
 	const preValidationErr = preValidation(registerObj, siteKey, value);
 
 	if (preValidationErr) {
@@ -26,9 +24,7 @@ export default function validateInput(
 	}
 
 	const ep = registerGetValue(registerObj, siteKey, "apiEndPoint");
-	console.log("obj:", registerObj, "siteKey:", siteKey, "ep:", ep);
 	if (ep) {
-		assertDefined(ep);
 		apiRequest(ep as string, siteKey, value, updater);
 	}
 }
@@ -39,7 +35,6 @@ function apiRequest(endpoint: string, key: string, value: string, updater: (site
 		input: value,
 	};
 
-	console.log(`${process.env.REACT_APP_REGISTER_API_ADDR}${endpoint}`);
 	fetch(`${process.env.REACT_APP_REGISTER_API_ADDR}${endpoint}`, {
 		method: "POST",
 		mode: "cors",
@@ -81,7 +76,6 @@ function preValidation(registerObj: RegisterObj, siteKey: string, value: string)
 	};
 
 	const preValArr = registerGetValue(registerObj, siteKey, "preValidation");
-	console.log(`preValidation for ${siteKey} is `, preValArr);
 
 	if (Array.isArray(preValArr) && preValArr.length > 0) {
 		const err = preValArr

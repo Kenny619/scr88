@@ -1,5 +1,6 @@
-import type { RegisterObj, SubObject, updateValues } from "../../typings/index";
+import type { RegisterObj, SubObject, updateValues, siteKeys } from "../../typings/index";
 import { assertDef } from "../utils/tshelper";
+
 export function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
 	for (const [k, v] of Object.entries(obj)) {
 		output[k] = v;
@@ -45,6 +46,7 @@ export function registerUpdate(obj: RegisterObj, siteKey: string, keyValArr: upd
 	return { ...obj };
 }
 
+//skip the value check and child check if input method was toggle or select and value was null
 export function isRegisterable(registerObj: RegisterObj): boolean {
 	for (const val of Object.values(registerObj)) {
 		//exit conditions
@@ -70,6 +72,44 @@ export function isRegisterable(registerObj: RegisterObj): boolean {
 
 type propNames = Exclude<keyof SubObject, "input" | "child">;
 type registerFindreturn = string | string[] | boolean | null;
+
+//propname : return value type pair
+//value: string | boolean
+//badgeStatus: badgeStatus
+//errorMsg: string
+//preValidation: null | string[]
+//apiEndPoint: string
+type returnVal<T extends propNames> = T extends "value"
+	? string | boolean
+	: T extends "badgeStatus"
+	  ? "Checking..." | "Pending Input" | "Pass" | "Fail"
+	  : T extends "errorMsg"
+		  ? string
+		  : T extends "preValidation"
+			  ? null | string[]
+			  : T extends "apiEndPoint"
+				  ? string
+				  : never;
+
+type getVal = <T extends propNames, U extends T>(obj: RegisterObj, siteKey: siteKeys, propNames: T) => undefined | returnVal<U>;
+
+export const getRegisterValue: getVal = (obj, siteKey, propName) => {
+	for (const key in obj) {
+		if (key === siteKey) {
+			const val = obj[key];
+			if (Object.prototype.hasOwnProperty.call(val, propName)) {
+				return val[propName] as ReturnType<getVal>;
+			}
+		}
+		const child = extractChild(obj[key]);
+		if (child) {
+			const ret = getRegisterValue(child, siteKey, propName);
+			if (ret !== undefined) {
+				return ret;
+			}
+		}
+	}
+};
 
 export function registerGetValue(obj: RegisterObj, siteKey: string, propName: propNames): registerFindreturn | undefined {
 	for (const key in obj) {
