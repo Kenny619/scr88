@@ -1,7 +1,7 @@
 import type { RegisterObj, updateValues } from "../../typings/index";
 import v from "validator";
 import { assertDefined } from "./tshelper";
-import { registerFn, registerGetValue } from "./register";
+import { registerGetValue } from "./register";
 export default function validateInput(
 	registerObj: RegisterObj, //reference to the current status of the object
 	siteKey: string,
@@ -17,6 +17,7 @@ export default function validateInput(
 	//Change the badge status to Checking until the test result comes back
 	updater(siteKey, [{ badgeStatus: "Checking..." }, { errorMsg: "" }]);
 
+	console.log(`passing siteKey:${siteKey}  value:${value}`);
 	const preValidationErr = preValidation(registerObj, siteKey, value);
 
 	if (preValidationErr) {
@@ -24,12 +25,12 @@ export default function validateInput(
 		return;
 	}
 
-	//escape backslash in regex
-	const postVal = siteKey === "lastPageNumberRegExp" || siteKey === "nextPageUrlRegExp" ? value.replace(/\\/g, "\\\\") : value;
-
-	const ep = registerFn(registerObj, siteKey, "apiEndPoint", registerGetValue);
-	assertDefined(ep);
-	apiRequest(ep as string, siteKey, postVal, updater);
+	const ep = registerGetValue(registerObj, siteKey, "apiEndPoint");
+	console.log("obj:", registerObj, "siteKey:", siteKey, "ep:", ep);
+	if (ep) {
+		assertDefined(ep);
+		apiRequest(ep as string, siteKey, value, updater);
+	}
 }
 
 function apiRequest(endpoint: string, key: string, value: string, updater: (siteKey: string, values: updateValues) => void) {
@@ -56,7 +57,7 @@ function apiRequest(endpoint: string, key: string, value: string, updater: (site
 		});
 }
 
-function preValidation(registerObj: RegisterObj, siteKey: string, value: string): string {
+function preValidation(registerObj: RegisterObj, siteKey: string, value: string): string | null {
 	const conds: { [key: string]: () => string } = {
 		url: () => {
 			return v.isURL(value) ? "" : "Input needs to be in a valid URL format.";
@@ -73,28 +74,23 @@ function preValidation(registerObj: RegisterObj, siteKey: string, value: string)
 		entryUrl: () => {
 			return registerObj.entryUrl.value ? "" : "Requires entryUrl input.";
 		},
-		tags: () => {
-			return registerObj.tags.value ? "" : "Requires tags input.";
-		},
 		lastUrl: () => {
-			return registerObj.lastUrlSelector.value ? "" : "Requires lastUrlSelector input.";
+			const lastUrlSelector = registerGetValue(registerObj, "last", "value");
+			return lastUrlSelector ? "" : "Requires lastUrlSelector input.";
 		},
 	};
 
-	const preValArr = registerFn(registerObj, siteKey, "preValidation", registerGetValue);
+	const preValArr = registerGetValue(registerObj, siteKey, "preValidation");
 	console.log(`preValidation for ${siteKey} is `, preValArr);
 
-	if (preValArr === null || (preValArr as string[]).length === 0) {
-		return "";
+	if (Array.isArray(preValArr) && preValArr.length > 0) {
+		const err = preValArr
+			.map((key) => conds[key]())
+			.filter((v) => v.length > 0)
+			.join("<br/>\r\n");
+
+		console.log("preErr=", err);
+		return err;
 	}
-
-	assertDefined(preValArr);
-	const err = (preValArr as string[])
-		.map((key) => conds[key]())
-		.filter((v) => v.length > 0)
-		.join("<br/>\r\n");
-
-	console.log("preErr=", err);
-
-	return err;
+	return null;
 }

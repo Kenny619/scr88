@@ -6,6 +6,7 @@ import express from "express";
 //import RedisStore from "connect-redis";
 import * as val from "../utils/registerServices.js";
 import { getSerializedDOM } from "../utils/registerHelper.js";
+type result = { pass: true; result: string | string[] } | { pass: false; errMsg: unknown | string };
 declare module "express-session" {
 	interface SessionData {
 		entryUrl?: string;
@@ -32,140 +33,169 @@ app.use(
 	}),
 );
 */
-async function generateDOM(session: Express.Request["session"]) {
-	if (session.entryUrl && !session.indexDOM) {
-		session.indexDOM = await getSerializedDOM(session.entryUrl);
-	}
-	if (session.articleUrl && !session.articleDOM) {
-		session.articleDOM = await getSerializedDOM(session.articleUrl);
-	}
-}
 
-register.post("/name", async (req, res) => {
-	const vresult = await val.name(req.body.name);
-	res.send(vresult);
-});
+const errorMessages = {
+	entryUrl: "entryUrl input required",
+	lastUrl: "lastUrl input required",
+	indexDOM: "Failed to acquire index page DOM.  entryUrl input required",
+	dom: (url: string, e: unknown) => `Faild to create DOM from URL ${url}\r\n<br>Error: ${e}`,
+};
+
+register.post("/name", async (req, res) => res.send(await val.name(req.body.name)));
 
 register.post("/url", async (req, res) => {
 	const vresult = await val.url(req.body.input);
-	if (vresult.pass) {
-		if (req.body.key === "entryUrl") {
-			req.session.entryUrl = vresult.result;
-			req.session.articleUrl = vresult.result;
-			req.session.indexDOM = await getSerializedDOM(req.body.input);
-			req.session.articleDOM = req.session.indexDOM;
-		}
-		req.session.save((err) => {
-			if (err) {
-				console.log(err);
-			}
-		});
+	if (vresult.pass && req.body.key === "entryUrl") {
+		req.session.entryUrl = req.body.input;
+		req.session.articleUrl = req.body.input; //placeholder.  If the user chooses siteType="links", this will be updated with correct article URL.
+
+		getDOM(req.body.input)
+			.then((dom) => {
+				req.session.indexDOM = dom;
+				//	req.session.save((err) => err && console.log(err));
+				res.send(vresult);
+			})
+			.catch((e) => res.send({ pass: false, errMsg: e }));
+	} else {
+		res.send(vresult);
 	}
-	res.send(vresult);
 });
 
-register.post("/lasturlregex", (req, res) => {
-	if (req.session.lastUrl) {
-		res.send(val.regex(req.body.input, req.session.lastUrl));
+register.post("/lasturl", (req, res) => {
+	if (req.session.indexDOM) {
+		const vresult = val.testSelector("link", req.session.indexDOM, req.body.input);
+		if (vresult.pass) req.session.lastUrl = vresult.result as string;
+		res.send(vresult);
 	} else {
-		res.send({
-			pass: false,
-			errMsg: "lastUrl input required",
-		});
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
+	}
+});
+
+register.post("/lasturlregex", async (req, res) => {
+	if (req.session.lastUrl) {
+		let vresult: result;
+		vresult = val.regex(req.session.lastUrl, req.body.input);
+		vresult = await generateArticleDOM(req.session, vresult);
+		res.send(vresult);
+	} else {
+		res.send({ pass: false, errMsg: errorMessages.lastUrl });
 	}
 });
 
 register.post("/parameter", async (req, res) => {
-	req.session.entryUrl ? res.send(await val.parameter(req.body.parameter, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
+	if (req.session.entryUrl) {
+		let vresult: result;
+		vresult = await val.parameter(req.session.entryUrl, req.body.input);
+		vresult = await generateArticleDOM(req.session, vresult);
+		res.send(vresult);
+	} else {
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
+	}
 });
 
 register.post("/pagenuminurl", async (req, res) => {
-	req.session.entryUrl ? res.send(await val.pageNumInUrl(req.body.regex, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
+	if (req.session.entryUrl) {
+		let vresult: result;
+		vresult = await val.pageNumInUrl(req.session.entryUrl, req.body.input);
+		vresult = await generateArticleDOM(req.session, vresult);
+		res.send(vresult);
+	} else {
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
+	}
 });
 
 register.post("/nexturlregex", async (req, res) => {
-	req.session.entryUrl ? res.send(await val.regex(req.body.regex, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
-});
-register.post("/nexturl", async (req, res) => {
-	req.session.entryUrl ? res.send(await val.link(req.body.input, req.session.entryUrl)) : res.send({ pass: false, errMsg: "entryUrl input required" });
-});
-
-register.post("/lasturl", async (req: express.Request, res: express.Response) => {
-	console.log(req.session);
-	if (req.session.indexDOM) {
-		const vresult = await val.link(req.body.input, req.session.indexDOM);
-		if (vresult.pass) {
-			req.session.lastUrl = vresult.result;
-		}
+	if (req.session.entryUrl) {
+		let vresult: result;
+		vresult = val.regex(req.session.entryUrl, req.body.input);
+		vresult = await generateArticleDOM(req.session, vresult);
 		res.send(vresult);
 	} else {
-		res.send({
-			pass: false,
-			errMsg: "entryUrl input required",
-		});
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
+	}
+});
+
+register.post("/nexturl", async (req, res) => {
+	if (req.session.indexDOM) {
+		let vresult: result;
+		vresult = val.testSelector("link", req.session.indexDOM, req.body.input);
+		vresult = await generateArticleDOM(req.session, vresult);
+		res.send(vresult);
+	} else {
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
 	}
 });
 
 register.post("/indexlinks", async (req, res) => {
 	if (req.session.indexDOM) {
-		const vresult = await val.links(req.body.input, req.session.indexDOM);
-
+		const vresult = val.testSelector("links", req.session.indexDOM, req.body.input);
 		if (vresult.pass) {
 			req.session.articleUrl = vresult.result[0];
-			req.session.articleDOM = await getSerializedDOM(req.session.articleUrl);
+			getDOM(req.session.articleUrl)
+				.then((dom) => {
+					req.session.articleDOM = dom;
+					res.send(vresult);
+				})
+				.catch((e) => res.send({ pass: false, errMsg: e }));
 		}
-		res.send(vresult);
 	} else {
-		res.send({
-			pass: false,
-			errMsg: "entryUrl input required",
-		});
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
 	}
 });
 
-register.post("/link", async (req, res) => {
-	await generateDOM(req.session);
-
-	req.session.indexDOM
-		? res.send(await val.link(req.body.input, req.session.indexDOM))
-		: res.send({
-				pass: false,
-				errMsg: "entryUrl input required",
-		  });
+register.post("/link", (req, res) => {
+	req.session.indexDOM ? res.send(val.testSelector("link", req.session.indexDOM, req.body.input)) : res.send({ pass: false, errMsg: errorMessages.entryUrl });
 });
 
-register.post("/links", async (req, res) => {
-	await generateDOM(req.session);
-
-	req.session.indexDOM
-		? res.send(await val.links(req.body.input, req.session.indexDOM))
-		: res.send({
-				pass: false,
-				errMsg: "entryUrl input required",
-		  });
+register.post("/links", (req, res) => {
+	req.session.indexDOM ? res.send(val.testSelector("links", req.session.indexDOM, req.body.input)) : res.send({ pass: false, errMsg: errorMessages.entryUrl });
 });
-register.post("/text", async (req, res) => {
+
+register.post("/text", (req, res) => {
+	req.session.articleDOM ? res.send(val.testSelector("text", req.session.articleDOM, req.body.input)) : res.send({ pass: false, errMsg: errorMessages.entryUrl });
+});
+
+register.post("/texts", (req, res) => {
+	req.session.articleDOM ? res.send(val.testSelector("texts", req.session.articleDOM, req.body.input)) : res.send({ pass: false, errMsg: errorMessages.entryUrl });
+});
+
+register.post("/articleblock", (req, res) => {
 	if (req.session.articleDOM) {
-		res.send(await val.text(req.body.input, req.session.articleDOM));
-	}
-});
-
-register.post("/texts", async (req, res) => {
-	if (req.session.articleDOM) {
-		res.send(await val.texts(req.body.input, req.session.articleDOM));
-	}
-});
-
-register.post("/articleblock", async (req, res) => {
-	if (req.session.articleDOM) {
-		const vresult = await val.nodes(req.body.input, req.session.articleDOM);
+		const vresult = val.testSelector("nodes", req.session.articleDOM, req.body.input);
 		if (vresult.pass) {
 			req.session.articleDOM = vresult.result[0] as string;
 		}
 		res.send(vresult);
 	} else {
-		res.send({ pass: false, errMsg: "entryUrl input required" });
+		res.send({ pass: false, errMsg: errorMessages.entryUrl });
 	}
 });
 
 export default register;
+
+async function getDOM(nextUrl: string | string[]) {
+	const url = Array.isArray(nextUrl) ? nextUrl[0] : nextUrl;
+
+	try {
+		const dom = await getSerializedDOM(url);
+		return dom;
+	} catch (e) {
+		throw new Error(`Faild to create DOM from URL ${url}\r\n<br>Error: ${e}`);
+	}
+}
+
+async function generateArticleDOM(session: Express.Request["session"], vresult: result): Promise<result> {
+	if (!session.articleUrl) {
+		return { pass: false, errMsg: errorMessages.entryUrl };
+	}
+	if (vresult.pass) {
+		let vr: result = vresult;
+		try {
+			session.articleDOM = await getDOM(session.articleUrl);
+		} catch (e) {
+			vr = { pass: false, errMsg: e };
+		}
+		return vr;
+	}
+	return vresult;
+}

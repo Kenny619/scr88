@@ -2,7 +2,8 @@ import { JSDOM, ResourceLoader } from "jsdom";
 import userAgent from "./userAgents.js";
 import https from "node:https";
 
-type extractTypes = "link" | "text" | "node";
+type singleTypes = "text" | "link" | "node";
+type multiTypes = "texts" | "links" | "nodes";
 
 export function isURLalive(url: string): Promise<boolean> {
 	return new Promise((resolve, reject) => {
@@ -39,21 +40,19 @@ export async function getSerializedDOM(url: string): Promise<string> {
 
 	try {
 		const jd = await JSDOM.fromURL(url, { resources: loader });
-		const dom = jd.serialize();
-		return dom;
+		return jd.serialize();
 	} catch (err) {
 		throw new Error(`JSDOM failed on ${url}\n ${err}`);
 	}
 }
 
-export function extractAll(type: extractTypes, dom: Document | string, selector: string): string[] {
-	//recreate JSDOM if dom was passed in a serialized string format
-	let elems: NodeListOf<Element> | undefined;
-	if (typeof dom === "string") {
-		const rdom = new JSDOM(dom).window.document;
-		elems = rdom.querySelectorAll(selector);
-	} else {
-		elems = dom.querySelectorAll(selector);
+export function extractAll(type: multiTypes, dom: Document | string, selector: string): string[] | { error: unknown } {
+	let elems: NodeListOf<Element>;
+	try {
+		const document = typeof dom === "string" ? new JSDOM(dom).window.document : dom;
+		elems = document.querySelectorAll(selector);
+	} catch (e) {
+		return { error: e };
 	}
 
 	//return empty array if querySelectorALl fails
@@ -64,40 +63,33 @@ export function extractAll(type: extractTypes, dom: Document | string, selector:
 	//Extracted string storage from the result of querySelectorAll.  Filter out null values.
 	let ary: string[] = [];
 
-	//force strict type checking on filter in below switch
-	function filterOutNull<T>(value: T | null | undefined): value is T {
-		if (value === null || value === undefined) return false;
-		const t: T = value;
-		return t ? true : true;
-	}
-
 	switch (type) {
-		case "link":
+		case "links":
 			ary = Array.from(elems)
 				.map((el) => el.getAttribute("href"))
 				.filter(filterOutNull);
 			break;
-		case "text":
+		case "texts":
 			ary = Array.from(elems)
 				.map((el) => el.textContent)
 				.filter(filterOutNull);
 			break;
-		case "node":
+		case "nodes":
 			ary = Array.from(elems)
 				.map((el) => el.outerHTML)
 				.filter(filterOutNull);
 			break;
 	}
-	return ary.length === 0 ? [] : (ary as string[]);
+	return ary.length > 0 ? ary : [];
 }
 
-export function extract(type: extractTypes, dom: string | Document, selector: string): string {
+export function extract(type: singleTypes, dom: string | Document, selector: string): string | { error: unknown } {
 	let el: Element | null = null;
-	if (typeof dom === "string") {
-		const rdom = new JSDOM(dom).window.document;
-		el = rdom.querySelector(selector);
-	} else {
-		el = dom.querySelector(selector);
+	try {
+		const document = typeof dom === "string" ? new JSDOM(dom).window.document : dom;
+		el = document.querySelector(selector);
+	} catch (e) {
+		return { error: e };
 	}
 
 	if (!el) {
@@ -112,4 +104,11 @@ export function extract(type: extractTypes, dom: string | Document, selector: st
 		case "node":
 			return el.outerHTML ?? "";
 	}
+}
+
+//force strict type checking on filter in below switch
+function filterOutNull<T>(value: T | null | undefined): value is T {
+	if (value === null || value === undefined) return false;
+	const t: T = value;
+	return t ? true : true;
 }

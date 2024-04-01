@@ -27,16 +27,21 @@ export function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
 
 export function registerUpdate(obj: RegisterObj, siteKey: string, keyValArr: updateValues): RegisterObj {
 	for (const key in obj) {
-		if (key === siteKey) {
+		if (siteKey === key) {
 			for (const kv of keyValArr) {
 				obj[key] = { ...obj[key], ...kv };
 			}
+			return { ...obj };
 		}
 
 		const child = extractChild(obj[key], "select");
-		child && registerUpdate(child, siteKey, keyValArr);
+		if (child) {
+			const updatedObj = registerUpdate(child, siteKey, keyValArr);
+			if (updatedObj !== undefined) {
+				obj[key].child = updatedObj;
+			}
+		}
 	}
-
 	return { ...obj };
 }
 
@@ -52,7 +57,12 @@ export function isRegisterable(registerObj: RegisterObj): boolean {
 		}
 
 		const child = extractChild(val);
-		child && isRegisterable(child);
+		if (child) {
+			const returned = isRegisterable(child);
+			if (returned === false) {
+				return false;
+			}
+		}
 	}
 
 	return true;
@@ -60,29 +70,56 @@ export function isRegisterable(registerObj: RegisterObj): boolean {
 
 type propNames = Exclude<keyof SubObject, "input" | "child">;
 type registerFindreturn = string | string[] | boolean | null;
-type registerFind = (obj: SubObject, propName: propNames) => registerFindreturn;
-export function registerFn(obj: RegisterObj, siteKey: string, arg: propNames, fn: registerFind): registerFindreturn {
-	for (const [k, v] of Object.entries(obj)) {
-		if (k === siteKey) {
-			return fn(v, arg);
+
+export function registerGetValue(obj: RegisterObj, siteKey: string, propName: propNames): registerFindreturn | undefined {
+	for (const key in obj) {
+		if (key === siteKey) {
+			const val = obj[key];
+			if (Object.prototype.hasOwnProperty.call(val, propName)) {
+				return val[propName];
+			}
 		}
-
-		const child = extractChild(v);
-		child && registerFn(child, siteKey, arg, fn);
+		const child = extractChild(obj[key]);
+		if (child) {
+			const ret = registerGetValue(child, siteKey, propName);
+			if (ret !== undefined) {
+				return ret;
+			}
+		}
 	}
-	return null;
 }
+// export function registerGetValue(obj: RegisterObj, siteKey: string, propName: propNames): registerFindreturn {
+// 	for (const key in obj) {
+// 		if (key === siteKey) {
+// 			const val = obj[key];
+// 			if (Object.prototype.hasOwnProperty.call(val, propName)) {
+// 				const ret = val[propName] as registerFindreturn;
+// 				console.log(`${siteKey}[${propName}]: exists!, returning ${val[propName]}`);
+// 				return ret;
+// 			}
+// 		}
+// 		const child = extractChild(obj[key], "selected");
+// 		console.log(`${key}: calling child ${JSON.stringify(child)}`);
+// 		if (child) {
+// 			const returned = registerGetValue(child, siteKey, propName);
+// 			if (returned !== undefined) {
+// 				return returned;
+// 			}
+// 		}
+// 	}
+// 	return null;
+// }
 
-export const registerGetValue: registerFind = (obj, propName) => {
-	if (Object.prototype.hasOwnProperty.call(obj, propName)) {
-		return obj[propName] as registerFindreturn;
-	}
-	return null;
-};
+// export const registerGetValue: registerFind = (obj, propName) => {
+// 	if (Object.prototype.hasOwnProperty.call(obj, propName)) {
+// 		return obj[propName] as registerFindreturn;
+// 	}
+// 	return null;
+// };
 
-export const registerHasProp: registerFind = (obj, propName) => {
-	return Object.hasOwn(obj, propName) ? true : false;
-};
+// export const registerHasProp: registerFind = (obj, propName) => {
+// 	return Object.prototype.hasOwnProperty.call(obj, propName) ? true : false;
+// };
 // export function registerHasProp(obj: SubObject, propName: string) {
 // 	return Object.hasOwn(obj, propName) ? true : false;
 // }
@@ -92,7 +129,7 @@ export const registerHasProp: registerFind = (obj, propName) => {
 // }
 
 function extractChild(obj: SubObject, mode = ""): null | RegisterObj {
-	if (!Object.hasOwn(obj, "child")) {
+	if (!Object.prototype.hasOwnProperty.call(obj, "child")) {
 		return null;
 	}
 
