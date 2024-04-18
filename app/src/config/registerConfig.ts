@@ -1,6 +1,4 @@
-import type { RegisterObj } from "../../typings/index";
-
-export const rObj: RegisterObj = {
+export const rObj = {
 	name: {
 		label: "Scraper config name",
 		input: {

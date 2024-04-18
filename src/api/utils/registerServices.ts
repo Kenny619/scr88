@@ -1,7 +1,6 @@
 import { isURLalive, extract, extractAll } from "./registerHelper.js";
 import validator from "validator";
 import mysql from "mysql2/promise";
-// type valResult<T extends string | string[]> = { pass: true; result: T } | { pass: false; errMsg: string | unknown };
 
 type singleTypes = "text" | "link" | "node";
 type multiTypes = "texts" | "links" | "nodes";
@@ -22,12 +21,34 @@ const connection = await mysql.createConnection(env);
 //validateName
 export async function name(name: string): Promise<result<string>> {
 	try {
-		const [result, field] = await connection.query("SELECT id FROM scrapers WHERE name = :name", { name: name });
+		const [result, field] = await connection.query(`SELECT id FROM scrapers WHERE name = '${name}'`);
 		console.log("result:", result, "field:", field);
 		return (result as []).length > 0 ? { pass: false, errMsg: "This name is already in use" } : { pass: true, result: "Valid name" };
 	} catch (e) {
 		return { pass: false, errMsg: e };
 	}
+}
+
+export async function saveconfig(obj: { key: string; val: string }) {
+	const insertQuery = `INSERT INTO scrapers (${obj.key}) values (${obj.val});`;
+	console.log(insertQuery);
+
+	try {
+		const [result, field] = await connection.query(insertQuery);
+		console.log(`saveconfig query: ${insertQuery} \r\nresult: ${result}, \r\nfield:, ${field})`);
+		return { pass: true, result: `Configuration saved as id${(result as mysql.ResultSetHeader).insertId}.` };
+	} catch (e) {
+		return { pass: false, errMsg: `Failed to save configuration.  ERROR: ${e}` };
+	} finally {
+		connection.end();
+	}
+
+	// try {
+	// 	const [result, field] = await connection.query(insertQuery);
+	// 	return true;
+	// } catch (e) {
+	// 	throw new Error(false);
+	// }
 }
 
 export async function url(url: string): Promise<result<string>> {

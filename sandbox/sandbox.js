@@ -314,5 +314,54 @@ const second = update("nextPageType", [{ value: "last" }], updated);
 const third = update("last", [{ value: "this is the last url" }], updated);
 const updatedd = update("lastPageNumberRegExp", [{ value: "this is also updated!" }, third]);
 
-console.dir(showNewObj(third));
+const registerGetKeys = (obj, mode, cond, output = []) => {
+	if (mode === "parent") {
+		return Object.entries(obj)
+			.filter(([k, v]) => v.input.method === cond)
+			.map(([k, v]) => k);
+	}
+
+	if (mode === "child") {
+		for (const key in obj) {
+			if (Object.hasOwn(obj[key], "child")) {
+				const childNode = obj[key].child;
+				const childKeys = Object.keys(childNode);
+				obj[key].input.method === cond && output.push(...childKeys);
+				registerGetKeys(childNode, mode, cond, output);
+			}
+		}
+		return output;
+	}
+
+	return output;
+};
+
+const returnInt = () => {
+	return new Promise((resolve, reject) => {
+		setTimeout(() => {
+			const randomInt = Math.floor(Math.random() * 100);
+			randomInt % 2 ? resolve("x2") : reject("not x2");
+		}, 500);
+	});
+};
+
+const receiveInt = async () => {
+	//return await returnInt();
+	/*
+	try {
+		return await returnInt();
+		//return true;
+	} catch (e) {
+		return e;
+	}
+	*/
+};
+
+const displayResult = async () => {
+	console.log(await receiveInt());
+};
+
+displayResult();
+//console.log(registerGetKeys(registerObj, "parent", "text"));
+// console.dir(showNewObj(third));
 //showFields(updated);

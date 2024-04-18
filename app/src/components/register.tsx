@@ -1,53 +1,30 @@
-import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField } from "@radix-ui/themes";
-import { createContext, useContext, useState } from "react";
-import type { updateValues, SubObject } from "../../typings/index";
-import { rObj as _registerObj } from "../config/registerConfig";
+import { Badge, Flex, RadioGroup, Switch, Table, Text, TextField, Button, Box } from "@radix-ui/themes";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import { createContext, useContext, useState, useRef } from "react";
+import type { registerUpdateArg, registerObjFlex, registerObj, registerProps } from "../../typings/index";
+import { rObj } from "../config/registerConfig";
 import validateInput from "../utils/validator";
 import { registerFlat, registerUpdate, isRegisterable } from "../utils/register";
+import saveRegisterConfig from "../utils/saveRegisterConfig";
+import "./dialog.css";
+type inputComp = (obj: { siteKey: string; params: registerProps }) => JSX.Element;
+type textComp = (obj: { siteKey: string }) => JSX.Element;
+type attrComp = (obj: { siteKey: string; attr: string }) => JSX.Element;
+type setState = React.Dispatch<React.SetStateAction<registerObjFlex>>;
+//type defaultSetRegisterObj = (setRegisterObj: setState) => void;
+const defaultFn: setState = (setRegisterObj) => {};
+const setRegisterObjContext = createContext(defaultFn);
+const registerObjContext = createContext(rObj as registerObjFlex);
+const UpdaterContext = createContext((siteKey: string, values: registerUpdateArg): void => {});
 
-const InputContext = createContext(_registerObj);
-const UpdaterContext = createContext((siteKey: string, values: updateValues): void => {});
+// const usePageReload = () => {
+// 	const forceUpdate = useReducer((x) => x + 1, 0)[1];
+// 	return () => forceUpdate();
+// };
 
-export default function InputTable() {
-	const [registerObj, setRegisterObj] = useState(_registerObj);
-
-	//useState fn wrapper
-	function updateRegisterObj(siteKey: string, keyValArr: updateValues): void {
-		const obj = registerUpdate(registerObj, siteKey, keyValArr);
-		console.count("updateRegisterObj");
-		setRegisterObj(obj);
-	}
-
-	//Create a flat OoO that only contains rendering objects
-	const renderObj: { [key: string]: SubObject } = registerFlat(registerObj);
-	console.table(renderObj);
-	console.log("isRegisterable: ", isRegisterable(registerObj));
+const TableRow: inputComp = ({ siteKey, params }) => {
 	return (
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.ColumnHeaderCell>Name</Table.ColumnHeaderCell>
-					<Table.ColumnHeaderCell>Input</Table.ColumnHeaderCell>
-					<Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-				</Table.Row>
-			</Table.Header>
-
-			<Table.Body className="inputFields">
-				<InputContext.Provider value={registerObj}>
-					<UpdaterContext.Provider value={updateRegisterObj}>
-						{Object.entries(renderObj).map(([key, params]) => {
-							return <TableRow siteKey={key} params={params} />;
-						})}
-					</UpdaterContext.Provider>
-				</InputContext.Provider>
-			</Table.Body>
-		</Table.Root>
-	);
-}
-
-function TableRow({ siteKey, params }: { siteKey: string; params: SubObject }): JSX.Element {
-	return (
-		<Table.Row key={siteKey}>
+		<Table.Row key={`${siteKey}-TableRow`}>
 			<Table.Cell>
 				<Text as="div" size={"3"}>
 					<label htmlFor={siteKey}>{siteKey}</label>
@@ -56,65 +33,81 @@ function TableRow({ siteKey, params }: { siteKey: string; params: SubObject }): 
 					{params.label}
 				</Text>
 			</Table.Cell>
-			<Table.Cell>
+			<Table.Cell key={`${siteKey}-TableCell-Input`}>
 				{params.input.method === "text" && <TextInputs siteKey={siteKey} />}
 				{params.input.method === "toggle" && <ToggleInputs siteKey={siteKey} params={params} />}
 				{params.input.method === "select" && <SelectInput siteKey={siteKey} params={params} />}
 				{Object.hasOwn(params, "errorMsg") && (
 					<Flex>
-						<ErrorMsg errorMsg={params.errorMsg as string} />
+						<ErrorMsg siteKey={siteKey} attr={params.errorMsg as string} />
 					</Flex>
 				)}
 			</Table.Cell>
-			<Table.Cell>{Object.hasOwn(params, "badgeStatus") && <StatusBadge badgeStatus={params.badgeStatus as string} />}</Table.Cell>
+			<Table.Cell key={`${siteKey}-TableCell-BadgeStatus`}>
+				{Object.hasOwn(params, "badgeStatus") && <StatusBadge siteKey={siteKey} attr={params.badgeStatus as string} />}
+			</Table.Cell>
 		</Table.Row>
 	);
-}
+};
 
-function TextInputs({ siteKey }: { siteKey: string }): JSX.Element {
+const TextInputs: textComp = ({ siteKey }) => {
 	const updateInputs = useContext(UpdaterContext);
-	const registerObj = useContext(InputContext);
+	const registerObj = useContext(registerObjContext);
 	return (
 		<Flex gap={"2"} p={"2"}>
-			<TextField.Root>
-				<TextField.Input id={siteKey} name={siteKey} onBlur={(e) => validateInput(registerObj, siteKey, e.target.value, updateInputs)} autoComplete={siteKey} />
+			<TextField.Root key={`${siteKey}-textInput`}>
+				<TextField.Input
+					id={`${siteKey}-textInput`}
+					name={`${siteKey}-nameAttr`}
+					onBlur={(e) => validateInput(registerObj, siteKey, e.target.value, updateInputs)}
+					autoComplete={siteKey}
+				/>
 			</TextField.Root>
 		</Flex>
 	);
-}
+};
 
-function ToggleInputs({ siteKey, params }: { siteKey: string; params: SubObject }): JSX.Element {
+const ToggleInputs: inputComp = ({ siteKey, params }) => {
 	const updateInputs = useContext(UpdaterContext);
-
 	const checkStatus = params.value;
 
 	return (
 		<Flex gap="2" p="2">
 			<Switch
+				key={`${siteKey}-toggleInput`}
+				defaultChecked={false}
 				className="CheckboxRoot"
 				checked={checkStatus as boolean}
-				id={siteKey}
+				id={`${siteKey}-toggleInput`}
 				onCheckedChange={() => updateInputs(siteKey, [{ value: !checkStatus }])}
 				size={"2"}
 				radius="none"
 			/>
 		</Flex>
 	);
-}
+};
 
-function SelectInput({ siteKey, params }: { siteKey: string; params: SubObject }): JSX.Element {
+const SelectInput: inputComp = ({ siteKey, params }) => {
 	const updateInputs = useContext(UpdaterContext);
 	const choices = params.input.choices as string[];
+	//
 	//radio button
 	return (
-		<RadioGroup.Root>
+		<RadioGroup.Root key={`${siteKey}-selectInput`} name={`${siteKey}-selectInput`}>
 			<Flex gap="2" direction="column">
 				{choices.map((v) => {
 					return (
 						<Text as="label" size="2" key={v}>
 							<Flex gap="2">
-								<RadioGroup.Item id={siteKey} key={v} value={v} onClick={() => updateInputs(siteKey, [{ value: v }])} />
-								{v}
+								<RadioGroup.Item
+									defaultChecked={false}
+									aria-checked={params.value === v}
+									id={`${siteKey}-selectInput-${v}`}
+									key={`${siteKey}-selectInput-${v}`}
+									value={v}
+									onClick={() => updateInputs(siteKey, [{ value: v }])}
+								/>
+								<label htmlFor={`${siteKey}-selectInput-${v}`}>{v}</label>
 							</Flex>
 						</Text>
 					);
@@ -122,20 +115,20 @@ function SelectInput({ siteKey, params }: { siteKey: string; params: SubObject }
 			</Flex>
 		</RadioGroup.Root>
 	);
-}
+};
 
-function ErrorMsg({ errorMsg }: { errorMsg: string }): JSX.Element {
+const ErrorMsg: attrComp = ({ siteKey, attr }) => {
 	return (
-		<Text as="div" size={"1"} color="tomato">
-			{errorMsg}
+		<Text key={`${siteKey}-errMsg`} id={`${siteKey}-errMsg`} as="div" size={"1"} color="tomato">
+			{attr}
 		</Text>
 	);
-}
+};
 
-function StatusBadge({ badgeStatus }: { badgeStatus: string }): JSX.Element {
+const StatusBadge: attrComp = ({ siteKey, attr }) => {
 	/** create statusBadge */
 	let color: "gray" | "green" | "tomato" = "gray";
-	switch (badgeStatus) {
+	switch (attr) {
 		case "Pending Input":
 			color = "gray";
 			break;
@@ -145,118 +138,108 @@ function StatusBadge({ badgeStatus }: { badgeStatus: string }): JSX.Element {
 		case "Fail":
 			color = "tomato";
 			break;
+		default:
+			color = "gray";
 	}
 
 	return (
-		<Flex p={"2"} gap={"2"}>
-			<Badge color={color} size={"2"}>
-				{badgeStatus}
+		<Flex key={`${siteKey}-badge`} p={"2"} gap={"2"}>
+			<Badge id={`${siteKey}-badge`} color={color} size={"2"}>
+				{attr}
 			</Badge>
 		</Flex>
 	);
-}
+};
 
-/*
-function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
-	for (const [k, v] of Object.entries(obj)) {
-		output[k] = v;
+const RegisterConfigButton = ({ registable, renderObj }: { registable: boolean; renderObj: registerObjFlex }): JSX.Element => {
+	const [dialogOpenState, setDialogOpenState] = useState(false);
+	const saveResult = useRef({ saved: false, dialogMessage: "" });
+	return (
+		<>
+			<Box key={"registerConfigButton"} display={"inline-block"}>
+				<Button
+					size={"3"}
+					m={"2"}
+					color="green"
+					disabled={!registable}
+					onClick={async () => {
+						saveResult.current = await saveRegisterConfig(renderObj);
+						setDialogOpenState(true);
+						console.log(saveResult, dialogOpenState);
+					}}
+				>
+					Save Scraper Configuration
+				</Button>
+			</Box>
+			{dialogOpenState && <RegisterConfigSaveDialog result={saveResult.current} />}
+		</>
+	);
+};
 
-		if (!Object.hasOwn(v, "child")) {
-			continue;
-		}
+const RegisterConfigSaveDialog = ({ result }: { result: { saved: boolean; dialogMessage: string } }) => {
+	console.log("registerConfigDialog!");
+	const [open, setOpen] = useState(true);
+	const setRegisterObj = useContext(setRegisterObjContext);
+	return (
+		<AlertDialog.Root key={"registerConfigSaveDialog"} defaultOpen={true} open={open} onOpenChange={setOpen}>
+			<AlertDialog.Portal>
+				<AlertDialog.Overlay className="AlertDialogOverlay" />
+				<AlertDialog.Content className="AlertDialogContent">
+					<AlertDialog.Title className="AlertDialogTitle">{result.saved ? "Success!" : "Save failed"}</AlertDialog.Title>
+					<AlertDialog.Description className="AlertDialogDescription">{result.dialogMessage}</AlertDialog.Description>
+					<AlertDialog.Cancel asChild>
+						<Button className="mauve" size={"2"} color={"gray"} type="button" onClick={() => result.saved && setRegisterObj(rObj)}>
+							Close
+						</Button>
+					</AlertDialog.Cancel>
+				</AlertDialog.Content>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
+	);
+};
 
-		if (v.input.method === "select" && (v.value === "single" || v.value === "pagenation" || v.value === "daily" || v.value === "weekly" || v.value === "monthly")) {
-			continue;
-		}
-
-		if (v.input.method === "select" && v.value !== null) {
-			const child = extractChild(v, "select");
-			child && registerFlat(child, output);
-		}
-
-		if ((v.input.method === "toggle" && v.value === true) || (v.input.method === "text" && v.value !== null)) {
-			const child = extractChild(v);
-			child && registerFlat(child, output);
-		}
-	}
-	return output;
-}
-
-function registerUpdate(obj: RegisterObj, siteKey: string, keyValArr: updateValues): RegisterObj {
-	for (const key in obj) {
-		if (key === siteKey) {
-			for (const kv of keyValArr) {
-				obj[key] = { ...obj[key], ...kv };
-			}
-		}
-
-		const child = extractChild(obj[key], "select");
-		child && registerUpdate(child, siteKey, keyValArr);
-	}
-
-	return { ...obj };
-}
-
-function isRegisterable(registerObj: RegisterObj): boolean {
-	for (const val of Object.values(registerObj)) {
-		//exit conditions
-		if ((val.input.method === "text" && val.badgeStatus !== "Pass") || (val.input.method === "select" && val.value === null)) {
-			return false;
-		}
-
-		if (!Object.hasOwn(val, "child")) {
-			continue;
-		}
-
-		const child = extractChild(val);
-		child && isRegisterable(child);
-	}
-
-	return true;
-}
-
-type registerFind = (obj: SubObject, propName: string) => string | boolean | null;
-function registerFn(obj: RegisterObj, siteKey: string, arg: string, fn: registerFind) {
-	for (const [k, v] of Object.entries(obj)) {
-		if (k === siteKey) {
-			return fn(v, arg);
-		}
-
-		const child = extractChild(v);
-		child && registerFn(child, siteKey, arg, fn);
-	}
-}
-
-function hasProp(obj: SubObject, propName: string) {
-	return Object.hasOwn(obj, propName) ? true : false;
-}
-
-function getValue(obj: SubObject, propName: string) {
-	return Object.hasOwn(obj, propName) ? obj[propName as keyof SubObject] : null;
-}
-
-function extractChild(obj: SubObject, mode = ""): null | RegisterObj {
-	if (!Object.hasOwn(obj, "child")) {
-		return null;
+export default function InputTable() {
+	const [registerObj, setRegisterObj] = useState(rObj as registerObjFlex);
+	//useState fn wrapper
+	function updateRegisterObj(siteKey: string, keyValArr: registerUpdateArg): void {
+		const obj = registerUpdate(registerObj, siteKey, keyValArr);
+		setRegisterObj(obj as registerObj);
 	}
 
-	//single and pagenation do not have child property for additional input. return null and skip recurrsion.
-	if (obj.input.method === "select" && (obj.value === "single" || obj.value === "pagenation" || obj.value === "daily" || obj.value === "weekly" || obj.value === "monthly")) {
-		console.log("selected single or pagenation!");
-		return null;
-	}
+	//reset the input page when registration completed successfully
+	// function usePageReset() {
+	// 	setRegisterObj(rObj);
+	// 	usePageReload();
+	// }
 
-	const child = assertDef(obj.child);
-	if (obj.input.method === "select" && mode && obj.value !== null) {
-		//only when input method is select and the mode="select" return su
-		//Object whose key is the selected value e.g. obj.value
-		const selected = obj.value as string;
-		const o: { [key: string]: SubObject } = {};
-		o[selected] = child[selected];
-		return o;
-	}
+	//Create a flat OoO that only contains rendering objects
+	const renderObj: registerObjFlex = registerFlat(registerObj);
+	const registable = isRegisterable(renderObj);
+	console.log(renderObj);
+	return (
+		<>
+			<registerObjContext.Provider value={registerObj}>
+				<UpdaterContext.Provider value={updateRegisterObj}>
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.ColumnHeaderCell>Name</Table.ColumnHeaderCell>
+								<Table.ColumnHeaderCell>Input</Table.ColumnHeaderCell>
+								<Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body className="inputFields">
+							{Object.entries(renderObj).map(([key, params]) => {
+								return <TableRow key={`${key}-tableRow`} siteKey={key} params={params} />;
+							})}
+						</Table.Body>
+					</Table.Root>
 
-	//otherwise return the subobject under child property
-	return child;
+					<setRegisterObjContext.Provider value={setRegisterObj}>
+						<RegisterConfigButton registable={registable} renderObj={renderObj} />
+					</setRegisterObjContext.Provider>
+				</UpdaterContext.Provider>
+			</registerObjContext.Provider>
+		</>
+	);
 }
-*/

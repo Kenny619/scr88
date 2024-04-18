@@ -19,8 +19,9 @@
 		"noUnusedParameters": true,
 
 		//Modules https://www.typescriptlang.org/tsconfig#Modules_6244
-		//    "moduleResolution": "node",
+		//"moduleResolution": "nodenext",
 		"module": "NodeNext",
+		"types": ["vitest/globals"],
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/app/*"],
@@ -47,6 +48,6 @@
 		//Completeness https://www.typescriptlang.org/tsconfig#Completeness_6257
 		"skipLibCheck": true
 	},
-	"include": ["src", ".env.d.ts"],
-	"exclude": ["node_modules", "dist", "build", "out", ".vscode", "typings"]
+	"include": ["src", ".env.d.ts"], //"tests/**/*"],
+	"exclude": ["app/src/**", "node_modules", "dist", "build", "out", ".vscode", "typings"]
 }

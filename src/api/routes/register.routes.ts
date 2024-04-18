@@ -41,7 +41,7 @@ const errorMessages = {
 	dom: (url: string, e: unknown) => `Faild to create DOM from URL ${url}\r\n<br>Error: ${e}`,
 };
 
-register.post("/name", async (req, res) => res.send(await val.name(req.body.name)));
+register.post("/name", async (req, res) => res.send(await val.name(req.body.input)));
 
 register.post("/url", async (req, res) => {
 	const vresult = await val.url(req.body.input);
@@ -168,6 +168,17 @@ register.post("/articleblock", (req, res) => {
 		res.send(vresult);
 	} else {
 		res.send({ pass: false, errMsg: errorMessages.entryUrl });
+	}
+});
+
+register.post("/saveconfig", async (req, res) => {
+	try {
+		const result = await val.saveconfig(req.body);
+		console.log(req.body);
+		res.send(result);
+	} catch (e) {
+		console.log(e);
+		res.send(e);
 	}
 });
 

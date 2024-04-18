@@ -1,7 +1,6 @@
-import type { RegisterObj, SubObject, updateValues, siteKeys } from "../../typings/index";
-import { assertDef } from "../utils/tshelper";
+import type { badgeValues, registerObjFlex, registerProps, registerSubObj, registerUpdateArg } from "../../typings/index";
 
-export function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
+export function registerFlat(obj: registerObjFlex, output: registerObjFlex = {}) {
 	for (const [k, v] of Object.entries(obj)) {
 		output[k] = v;
 
@@ -26,7 +25,7 @@ export function registerFlat(obj: RegisterObj, output: RegisterObj = {}) {
 	return output;
 }
 
-export function registerUpdate(obj: RegisterObj, siteKey: string, keyValArr: updateValues): RegisterObj {
+export function registerUpdate(obj: registerObjFlex, siteKey: string, keyValArr: registerUpdateArg) {
 	for (const key in obj) {
 		if (siteKey === key) {
 			for (const kv of keyValArr) {
@@ -35,30 +34,40 @@ export function registerUpdate(obj: RegisterObj, siteKey: string, keyValArr: upd
 			return { ...obj };
 		}
 
-		const child = extractChild(obj[key], "select");
-		if (child) {
-			const updatedObj = registerUpdate(child, siteKey, keyValArr);
-			if (updatedObj !== undefined) {
-				obj[key].child = updatedObj;
+		if ("child" in obj[key]) {
+			const child = extractChild(obj[key], "select");
+			if (child) {
+				const updatedObj = registerUpdate(child, siteKey, keyValArr);
+				if (updatedObj !== undefined) {
+					obj[key].child = { ...updatedObj };
+				}
 			}
 		}
 	}
+	console.log(obj);
 	return { ...obj };
 }
 
 //skip the value check and child check if input method was toggle or select and value was null
-export function isRegisterable(registerObj: RegisterObj): boolean {
-	for (const val of Object.values(registerObj)) {
+export function isRegisterable(registerObj: registerObjFlex): boolean {
+	for (const [key, val] of Object.entries(registerObj)) {
 		//exit conditions
-		if ((val.input.method === "text" && val.badgeStatus !== "Pass") || (val.input.method === "select" && val.value === null)) {
+		if (val.input.method === "text" && val.badgeStatus !== "Pass") {
+			console.log(`returning due to ${key} having ${JSON.stringify(val)} `);
 			return false;
 		}
-
+		if (val.input.method === "select" && val.value === null) {
+			console.log(`returning due to ${key} having ${val} `);
+			return false;
+		}
+		if (val.input.method === "toggle" && val.value === false) {
+			continue;
+		}
 		if (!Object.hasOwn(val, "child")) {
 			continue;
 		}
 
-		const child = extractChild(val);
+		const child = extractChild(val, "select");
 		if (child) {
 			const returned = isRegisterable(child);
 			if (returned === false) {
@@ -70,19 +79,11 @@ export function isRegisterable(registerObj: RegisterObj): boolean {
 	return true;
 }
 
-type propNames = Exclude<keyof SubObject, "input" | "child">;
-type registerFindreturn = string | string[] | boolean | null;
-
-//propname : return value type pair
-//value: string | boolean
-//badgeStatus: badgeStatus
-//errorMsg: string
-//preValidation: null | string[]
-//apiEndPoint: string
+type propNames = Exclude<keyof registerProps, "input" | "child">;
 type returnVal<T extends propNames> = T extends "value"
 	? string | boolean
 	: T extends "badgeStatus"
-	  ? "Checking..." | "Pending Input" | "Pass" | "Fail"
+	  ? badgeValues
 	  : T extends "errorMsg"
 		  ? string
 		  : T extends "preValidation"
@@ -91,14 +92,14 @@ type returnVal<T extends propNames> = T extends "value"
 				  ? string
 				  : never;
 
-type getVal = <T extends propNames, U extends T>(obj: RegisterObj, siteKey: siteKeys, propNames: T) => undefined | returnVal<U>;
+type getVal = <T extends propNames, U extends T>(obj: registerObjFlex, siteKey: string, propNames: T) => undefined | returnVal<U>;
 
 export const getRegisterValue: getVal = (obj, siteKey, propName) => {
 	for (const key in obj) {
 		if (key === siteKey) {
 			const val = obj[key];
-			if (Object.prototype.hasOwnProperty.call(val, propName)) {
-				return val[propName] as ReturnType<getVal>;
+			if (Object.hasOwn(val, propName)) {
+				return val[propName] as returnVal<typeof propName>;
 			}
 		}
 		const child = extractChild(obj[key]);
@@ -111,84 +112,21 @@ export const getRegisterValue: getVal = (obj, siteKey, propName) => {
 	}
 };
 
-export function registerGetValue(obj: RegisterObj, siteKey: string, propName: propNames): registerFindreturn | undefined {
-	for (const key in obj) {
-		if (key === siteKey) {
-			const val = obj[key];
-			if (Object.prototype.hasOwnProperty.call(val, propName)) {
-				return val[propName];
-			}
-		}
-		const child = extractChild(obj[key]);
-		if (child) {
-			const ret = registerGetValue(child, siteKey, propName);
-			if (ret !== undefined) {
-				return ret;
-			}
-		}
-	}
-}
-// export function registerGetValue(obj: RegisterObj, siteKey: string, propName: propNames): registerFindreturn {
-// 	for (const key in obj) {
-// 		if (key === siteKey) {
-// 			const val = obj[key];
-// 			if (Object.prototype.hasOwnProperty.call(val, propName)) {
-// 				const ret = val[propName] as registerFindreturn;
-// 				console.log(`${siteKey}[${propName}]: exists!, returning ${val[propName]}`);
-// 				return ret;
-// 			}
-// 		}
-// 		const child = extractChild(obj[key], "selected");
-// 		console.log(`${key}: calling child ${JSON.stringify(child)}`);
-// 		if (child) {
-// 			const returned = registerGetValue(child, siteKey, propName);
-// 			if (returned !== undefined) {
-// 				return returned;
-// 			}
-// 		}
-// 	}
-// 	return null;
-// }
-
-// export const registerGetValue: registerFind = (obj, propName) => {
-// 	if (Object.prototype.hasOwnProperty.call(obj, propName)) {
-// 		return obj[propName] as registerFindreturn;
-// 	}
-// 	return null;
-// };
-
-// export const registerHasProp: registerFind = (obj, propName) => {
-// 	return Object.prototype.hasOwnProperty.call(obj, propName) ? true : false;
-// };
-// export function registerHasProp(obj: SubObject, propName: string) {
-// 	return Object.hasOwn(obj, propName) ? true : false;
-// }
-
-// export function registerGetValue(obj: SubObject, propName: string) {
-// 	return Object.hasOwn(obj, propName) ? obj[propName as keyof SubObject] : null;
-// }
-
-function extractChild(obj: SubObject, mode = ""): null | RegisterObj {
-	if (!Object.prototype.hasOwnProperty.call(obj, "child")) {
+function extractChild(obj: registerProps, mode = ""): null | registerObjFlex {
+	if (!("child" in obj)) {
 		return null;
 	}
 
-	//single and pagenation do not have child property for additional input. return null and skip recurrsion.
-	if (obj.input.method === "select" && (obj.value === "single" || obj.value === "pagenation" || obj.value === "daily" || obj.value === "weekly" || obj.value === "monthly")) {
-		console.log("selected single or pagenation!");
+	if (obj.input.method === "select" && !Object.keys(obj.child as registerSubObj).find((v) => v === obj.value)) {
 		return null;
 	}
 
-	const child = assertDef(obj.child);
 	if (obj.input.method === "select" && mode && obj.value !== null) {
-		//only when input method is select and the mode="select" return su
-		//Object whose key is the selected value e.g. obj.value
-		const selected = obj.value as string;
-		const o: { [key: string]: SubObject } = {};
-		o[selected] = child[selected];
-		return o;
+		const v = (obj.child as registerObjFlex)[obj.value as keyof typeof obj.child];
+		const child: registerObjFlex = {};
+		child[obj.value as keyof typeof child] = v;
+		return child;
 	}
-
 	//otherwise return the subobject under child property
-	return child;
+	return obj.child as registerObjFlex;
 }
