@@ -1,6 +1,8 @@
+import Log from "src/log/logging.js";
 import type { ScrapersConfig, Scraped } from "../../typings/index.js";
-import { getDOM, extract, extractAll } from "../api/utils/registerHelper.js";
+import { getDOM, extract, extractAll, isURLalive } from "../api/utils/registerHelper.js";
 
+Log.init("Scraper", "./../../../logs/log.txt");
 export class Scraper {
 	indexURLQueue: string[];
 	articleURLQueue: string[];
@@ -26,25 +28,35 @@ export class Scraper {
 
 	scrapeArticle(target: Document | Element) {
 		const scraped: Scraped = { scraperId: null, articleURL: null, language: null, title: null, body: null, tags: null };
+		let tags = [];
+
+		//tag filtering & collection
 		if (this.scraperConfig.tagFiltering || this.scraperConfig.tagCollect) {
-			const articleTags = extractAll("texts", target, this.scraperConfig.articleTagSelector as string);
+			try {
+				tags = extractAll("texts", target, this.scraperConfig.articleTagSelector as string);
 
-			//tagFilter:  Exit function if scraperConfig.tags shares same tag as the article.
-			if (this.scraperConfig.tagFiltering) {
-				const filterTags = this.scraperConfig.tags.split(",");
-				const tagSetSize = new Set(articleTags.concat(filterTags)).size;
-				if (tagSetSize !== filterTags.length + articleTags.length) {
-					return;
+				if (this.scraperConfig.tagFiltering) {
+					//tagFilter:  Exit function if scraperConfig.tags shares same tag as the article.
+					const filterTags = this.scraperConfig.tags.split(",");
+					const tagSetSize = new Set(tags.concat(filterTags)).size;
+					if (tagSetSize === filterTags.length + tags.length) {
+						return; //no match.  Exit scraperArticle
+					}
 				}
-			}
-
-			if (this.scraperConfig.tagCollect) {
-				scraped.tags = articleTags;
+				if (this.scraperConfig.tagCollect) scraped.tags = tags;
+			} catch (e) {
+				Log.error(Function.name, "extracAll failed to return value");
+				return;
 			}
 		}
 
-		scraped.title = extract("text", target, this.scraperConfig.articleTitleSelector);
-		scraped.body = extract("text", target, this.scraperConfig.articleBodySelector);
+		try {
+			scraped.title = extract("text", target, this.scraperConfig.articleTitleSelector);
+			scraped.body = extract("text", target, this.scraperConfig.articleBodySelector);
+		} catch (e) {
+			Log.error(Function.name, `${e}`);
+			return;
+		}
 		scraped.scraperId = this.scraperConfig.scraperId;
 		scraped.articleURL = this.current.articleURL;
 		scraped.language = this.scraperConfig.language;
@@ -63,8 +75,13 @@ export class Scraper {
 			this.current.articleDOM = this.articleDOMQueue.shift() as Document;
 
 			if (this.scraperConfig.siteType === "multiple") {
-				const articleElements = extractAll("nodeElements", this.current.articleDOM, this.scraperConfig.articleBodySelector);
-				this.articleElementQueue.push(...articleElements);
+				try {
+					const articleElements = extractAll("nodeElements", this.current.articleDOM, this.scraperConfig.articleBodySelector);
+					this.articleElementQueue.push(...articleElements);
+				} catch (e) {
+					Log.error(Function.name, `${e}`);
+					return;
+				}
 			} else {
 				this.scrapeArticle(this.current.articleDOM);
 			}
@@ -91,8 +108,14 @@ export class Scraper {
 			} catch (e) {
 				throw new Error(`getDOM failed in extractURLfromIndex.  this.current.indexURL=${this.current.indexURL}`);
 			}
-			const urls = extractAll("links", this.current.indexDOM, this.scraperConfig.links as string);
-			this.articleURLQueue.push(...urls);
+
+			try {
+				const urls = extractAll("links", this.current.indexDOM, this.scraperConfig.links as string);
+				this.articleURLQueue.push(...(urls as string[]));
+			} catch (e) {
+				Log.error(Function.name, `${e}`);
+				return;
+			}
 			await this.next();
 			return;
 		}
@@ -153,22 +176,24 @@ export class Scraper {
 
 		try {
 			this.current.indexDOM = await getDOM(this.scraperConfig.entryUrl);
-		} catch (e) {}
 
-		const lastURL = extract("link", this.current.indexDOM as Document, this.scraperConfig.last as string);
-		const regex = new RegExp(this.scraperConfig.lastPageNumberRegExp as string);
-		const lastPageNumArr = lastURL.match(regex);
-		if (Array.isArray(lastPageNumArr)) {
-			const lastPageNumStr = lastPageNumArr[1];
-			const lastPageNumInt = Number(lastPageNumStr);
-			for (let i = 2; i <= lastPageNumInt; i++) {
-				this.articleURLQueue.push(lastURL.replace(lastPageNumStr, String(i)));
+			const lastURL = extract("link", this.current.indexDOM as Document, this.scraperConfig.last as string);
+			const regex = new RegExp(this.scraperConfig.lastPageNumberRegExp as string);
+			const lastPageNumArr = lastURL.match(regex);
+			if (Array.isArray(lastPageNumArr)) {
+				const lastPageNumStr = lastPageNumArr[1];
+				const lastPageNumInt = Number(lastPageNumStr);
+				for (let i = 2; i <= lastPageNumInt; i++) {
+					this.articleURLQueue.push(lastURL.replace(lastPageNumStr, String(i)));
+				}
+				this.noMoreURL = true;
+				return;
 			}
+		} catch (e) {
+			Log.error(Function.name, `${e}`);
 			this.noMoreURL = true;
 			return;
 		}
-
-		throw new Error(`buildUrlQueueLast failed.  match returned no result.  ${regex} on ${lastURL}`);
 	}
 
 	async buildUrlQueueNext() {
@@ -180,61 +205,68 @@ export class Scraper {
 			} catch (e) {}
 		}
 
-		const newURL = extract("link", this.current.indexDOM as Document, this.scraperConfig.next as string);
-
-		if (newURL) {
-			this.articleURLQueue.push(newURL);
+		try {
+			const newURL = extract("link", this.current.indexDOM as Document, this.scraperConfig.next as string);
+			if (newURL) {
+				this.articleURLQueue.push(newURL);
+				return;
+			}
+		} catch (e) {
+			this.noMoreURL = true;
+			Log.error(Function.name, `${e}`);
 			return;
 		}
-		this.noMoreURL = true;
-		throw new Error("Failed buildUrlQueueNext.  extract returned no url.");
 	}
 
 	async buildUrlQueueParameter() {
 		assert(this.scraperConfig.parameter);
 
 		if (!this.current.articleURL) this.current.articleURL = this.scraperConfig.entryUrl;
-		const urlObj = new URL(this.current.articleURL);
 
 		try {
+			const urlObj = new URL(this.current.articleURL);
 			const params = new URLSearchParams(urlObj.search);
 			const pageNum = Number(params.get(this.scraperConfig.parameter));
 			params.set(this.scraperConfig.parameter, String(pageNum + 1));
 			const newURL = `${urlObj.origin}?${params.toString()}`;
-			this.articleURLQueue.push(newURL);
+			(await isURLalive(newURL)) && this.articleURLQueue.push(newURL);
 			return;
 		} catch (e) {
 			this.noMoreURL = true;
-			throw new Error(`${Function.name} failed.  urlObj:${urlObj}`);
+			Log.error(Function.name, `${e}`);
+			return;
 		}
 	}
 
 	async buildUrlQueueUrl() {
 		if (!this.current.articleURL) this.current.articleURL = this.scraperConfig.entryUrl;
 
-		const regex = new RegExp(this.scraperConfig.url as string);
-		const matched = this.current.articleURL.match(regex);
-		if (matched) {
-			const CurPageNumStr = matched[1];
-			const NextpageNumStr = String(Number(matched[1]) + 1);
-			const newURL = this.current.articleURL.replace(CurPageNumStr, NextpageNumStr);
-			this.articleURLQueue.push(newURL);
-			return;
-		}
+		try {
+			const regex = new RegExp(this.scraperConfig.url as string);
+			const matched = this.current.articleURL.match(regex);
 
-		this.noMoreURL = true;
-		throw new Error(`${Function.name} failed.  regex:${regex} url: ${this.current.articleURL}`);
+			if (matched) {
+				const CurPageNumStr = matched[1];
+				const NextpageNumStr = String(Number(matched[1]) + 1);
+				const newURL = this.current.articleURL.replace(CurPageNumStr, NextpageNumStr);
+				this.articleURLQueue.push(newURL);
+				return;
+			}
+		} catch (e) {
+			this.noMoreURL = true;
+			Log.error(Function.name, `${e}`);
+		}
 	}
 
 	async buildArticleElementQueue() {
-		const articleElems = extractAll("nodeElements", this.current.articleDOM as Document, this.scraperConfig.articleBodySelector);
-		if (articleElems) {
-			this.articleElementQueue.push(...articleElems);
+		try {
+			const articleElems = extractAll("nodeElements", this.current.articleDOM as Document, this.scraperConfig.articleBodySelector);
+			articleElems && this.articleElementQueue.push(...articleElems);
 			return;
+		} catch (e) {
+			this.noMoreURL = true;
+			Log.error(Function.name, `${e}`);
 		}
-
-		this.noMoreURL = true;
-		throw new Error(`${Function.name} failed.`);
 	}
 }
 

@@ -1,11 +1,14 @@
+import type { result, extractTypes, multiTypes } from "../../../typings/api.js";
 import { isURLalive, extract, extractAll } from "./registerHelper.js";
 import validator from "validator";
 import mysql from "mysql2/promise";
+import Log from "src/log/logging.js";
 
-type singleTypes = "text" | "link" | "node";
-type multiTypes = "texts" | "links" | "nodes";
-type extractTypes = singleTypes | multiTypes;
-type result<T extends string | string[]> = { pass: true; result: T } | { pass: false; errMsg: string } | { pass: false; errMsg: unknown };
+//funciton types
+type FnPromiseStr = (input: string) => Promise<result<string>>;
+type FnURLPromiseStr = (pageUrl: string, input: string) => Promise<result<string>>;
+//logging
+Log.init("registerService", process.env.LOGFILEPATH as string);
 
 //mysql
 const env = {
@@ -19,77 +22,78 @@ const env = {
 const connection = await mysql.createConnection(env);
 
 //validateName
-export async function name(name: string): Promise<result<string>> {
+const name: FnPromiseStr = async (input) => {
 	try {
-		const [result, field] = await connection.query(`SELECT id FROM scrapers WHERE name = '${name}'`);
+		const [result, field] = await connection.query(`SELECT id FROM scrapers WHERE name = '${input}'`);
 		console.log("result:", result, "field:", field);
 		return (result as []).length > 0 ? { pass: false, errMsg: "This name is already in use" } : { pass: true, result: "Valid name" };
 	} catch (e) {
 		return { pass: false, errMsg: e };
 	}
-}
+};
 
-export async function saveconfig(obj: { key: string; val: string }) {
+const saveconfig = async (obj: { key: string; val: string }): Promise<result<string>> => {
 	const insertQuery = `INSERT INTO scrapers (${obj.key}) values (${obj.val});`;
-	console.log(insertQuery);
 
 	try {
-		const [result, field] = await connection.query(insertQuery);
-		console.log(`saveconfig query: ${insertQuery} \r\nresult: ${result}, \r\nfield:, ${field})`);
+		const [result, _] = await connection.query(insertQuery);
 		return { pass: true, result: `Configuration saved as id${(result as mysql.ResultSetHeader).insertId}.` };
 	} catch (e) {
 		return { pass: false, errMsg: `Failed to save configuration.  ERROR: ${e}` };
 	} finally {
 		connection.end();
 	}
+};
 
-	// try {
-	// 	const [result, field] = await connection.query(insertQuery);
-	// 	return true;
-	// } catch (e) {
-	// 	throw new Error(false);
-	// }
-}
+const url: FnPromiseStr = async (input) => {
+	if (!validator.isURL(input)) {
+		return { pass: false, errMsg: "Invalid URL format" };
+	}
 
-export async function url(url: string): Promise<result<string>> {
-	return !validator.isURL(url)
-		? { pass: false, errMsg: "Invalid URL format" }
-		: (await isURLalive(url))
-		  ? { pass: true, result: url }
-		  : { pass: false, errMsg: "URL is not alive" };
-}
-
-export function testSelector<T extends extractTypes>(type: T, serializedDom: string, selector: string): result<string | string[]> {
-	const extracted = type === "text" || type === "link" || type === "node" ? extract(type, serializedDom, selector) : extractAll(type, serializedDom, selector);
 	try {
-		return !Array.isArray(extracted) && typeof extracted === "object"
-			? { pass: false, errMsg: extracted.error }
-			: extracted
-			  ? { pass: true, result: extracted }
-			  : { pass: false, errMsg: "Input selector could not find a match" };
+		await isURLalive(input);
+		return { pass: true, result: input };
 	} catch (e) {
 		return { pass: false, errMsg: e };
 	}
-}
+};
 
-export function regex(url: string, regex: string): result<string> {
+type ReturnObj<T extends string | string[] | Element | Element[]> = { pass: true; result: T } | { pass: false; errMsg: unknown };
+type passedReturn<T extends extractTypes> = T extends "nodeElement"
+	? Element
+	: T extends "nodeElements"
+	  ? Element[]
+	  : T extends Exclude<multiTypes, "nodeElements">
+		  ? string[]
+		  : string;
+type TestSelectorReturn<T extends extractTypes> = ReturnObj<passedReturn<T>>;
+type TestSelector = <T extends extractTypes>(type: T, serializedDom: string, selector: string) => TestSelectorReturn<T>;
+const testSelector: TestSelector = (type, serializedDom, selector) => {
 	try {
-		const r = new RegExp(regex);
-		const m = url.match(r);
-		console.log(r, m, regex, url);
-		return m ? { pass: true, result: m[1] } : { pass: false, errMsg: "No match" };
+		const extracted =
+			type === "text" || type === "link" || type === "node" || type === "nodeElement" ? extract(type, serializedDom, selector) : extractAll(type, serializedDom, selector);
+		return { pass: true, result: extracted as string | string[] | Element | Element[] } as TestSelectorReturn<typeof type>;
+	} catch (e) {
+		return { pass: false, errMsg: `${e}` };
+	}
+};
+
+const regex = (pageUrl: string, input: string): result<string> => {
+	try {
+		const matchResult = pageUrl.match(new RegExp(input));
+		return matchResult ? { pass: true, result: matchResult[1] } : { pass: false, errMsg: "No match" };
 	} catch (e) {
 		return { pass: false, errMsg: e };
 	}
-}
+};
 
-export async function parameter(u: string, parameter: string): Promise<result<string>> {
+const parameter: FnURLPromiseStr = async (pageUrl, input) => {
 	try {
-		const urlObj = new URL(u);
+		const urlObj = new URL(pageUrl);
 		const params = urlObj.searchParams;
-		if (params.has(parameter)) {
-			const pageNum = params.get(parameter);
-			params.set(parameter, String(Number(pageNum as string) + 1));
+		if (params.has(input)) {
+			const pageNum = params.get(input);
+			params.set(input, String(Number(pageNum as string) + 1));
 			const newUrl = `${urlObj.origin}?${params.toString()}`;
 			return await url(newUrl);
 		}
@@ -97,11 +101,11 @@ export async function parameter(u: string, parameter: string): Promise<result<st
 	} catch (e) {
 		return { pass: false, errMsg: e };
 	}
-}
+};
 
-export async function pageNumInUrl(pageUrl: string, regex: string): Promise<result<string>> {
+const pageNumInUrl: FnURLPromiseStr = async (pageUrl, input) => {
 	try {
-		const re = new RegExp(regex);
+		const re = new RegExp(input);
 		const m = pageUrl.match(re);
 		if (m) {
 			const NextpageNum = String(Number(m[1]) + 1);
@@ -110,6 +114,8 @@ export async function pageNumInUrl(pageUrl: string, regex: string): Promise<resu
 		}
 		return { pass: false, errMsg: "No matching URL parameter" };
 	} catch (e) {
-		return { pass: false, errMsg: `${regex} is not a valid regular expression` };
+		return { pass: false, errMsg: `${input} is not a valid regular expression` };
 	}
-}
+};
+
+export { name, saveconfig, url, regex, parameter, pageNumInUrl, testSelector };

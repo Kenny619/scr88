@@ -1,11 +1,9 @@
+import type { singleTypes, multiTypes } from "../../../typings/api.js";
 import { JSDOM, ResourceLoader } from "jsdom";
 import userAgent from "./userAgents.js";
 import v from "validator";
 import https from "node:https";
 import http from "node:http";
-
-type singleTypes = "text" | "link" | "node";
-type multiTypes = "texts" | "links" | "nodes" | "nodeElements";
 
 type IsURLalive = (url: string) => Promise<boolean>;
 const isURLalive: IsURLalive = (url: string) => {
@@ -16,14 +14,14 @@ const isURLalive: IsURLalive = (url: string) => {
 		const protocol = urlObj.protocol === "https:" ? https : urlObj.protocol === "http:" ? http : null;
 
 		if (protocol === null) {
-			reject(false);
+			reject(`Invalid protocol: ${protocol}`);
 		} else {
 			protocol
 				.get(url, (res) => {
 					(res.statusCode as number) < 400 ? resolve(true) : reject(false);
 				})
-				.on("error", () => {
-					reject(false);
+				.on("error", (err) => {
+					reject(err);
 				});
 		}
 	});
@@ -54,7 +52,8 @@ const getSerializedDOM: GetSerializedDOM = async (url: string) => {
 		throw new Error(`getSerializedDOM failed on ${url}\n ${err}`);
 	}
 };
-type ExtractAllReturn<T extends multiTypes> = T extends "nodeElements" ? Element[] : T extends Exclude<multiTypes, "nodeElements"> ? string[] : never; //T extends Exclude<multiTypes, "nodeElements"> ? string : T extends "nodeElement" ? Element : never;
+
+type ExtractAllReturn<T extends multiTypes> = T extends "nodeElements" ? Element[] : string[];
 type ExtractAll = <T extends multiTypes>(type: T, dom: Document | Element | string, selector: string) => ExtractAllReturn<T>;
 const extractAll: ExtractAll = (type, dom, selector) => {
 	let elems: NodeListOf<Element>;
@@ -62,10 +61,10 @@ const extractAll: ExtractAll = (type, dom, selector) => {
 		const document = typeof dom === "string" ? new JSDOM(dom).window.document : (dom as Document);
 		elems = document.querySelectorAll(selector);
 	} catch (e) {
-		throw new Error(`extractAll failed.   type:${type}, selector:${selector}, e:${e}`);
+		throw new Error(`${e}`);
 	}
 
-	let ary = [] as string[] | Element[];
+	let ary: string[] | Element[] = [];
 
 	switch (type) {
 		case "links":
@@ -89,33 +88,37 @@ const extractAll: ExtractAll = (type, dom, selector) => {
 				.filter(filterOutNull);
 			break;
 	}
+	if (ary.length === 0) throw new Error(`${Function.name} returned no value`);
 	return ary as ExtractAllReturn<typeof type>;
 };
 
-export function extract<T extends string | Element | Document>(type: singleTypes, dom: T, selector: string): T extends string ? string | { error: unknown } : string {
+//return Element type if type is set to "nodeElement".  For everything else return string.
+type extractRet<T extends singleTypes> = T extends "nodeElement" ? Element : string;
+type Extract = <T extends singleTypes>(type: T, dom: string | Element | Document, selector: string) => extractRet<T>;
+const extract: Extract = (type, dom, selector) => {
 	let el: Element | null = null;
 	try {
 		const document = typeof dom === "string" ? new JSDOM(dom).window.document : (dom as Document | Element);
 		el = document.querySelector(selector);
 	} catch (e) {
-		if (typeof dom === "string") {
-			throw new Error(`${e}`);
-		}
-		throw e;
+		throw new Error(`${e}`);
 	}
 	if (!el) {
-		return "";
+		throw new Error(`${Function.name} failed to extract Element using ${selector}`);
 	}
-
 	switch (type) {
 		case "link":
-			return el.getAttribute("href") ?? "";
+			return (el.getAttribute("href") as extractRet<typeof type>) ?? "";
 		case "text":
-			return el.textContent ?? "";
+			return (el.textContent as extractRet<typeof type>) ?? "";
 		case "node":
-			return el.outerHTML ?? "";
+			return (el.outerHTML as extractRet<typeof type>) ?? "";
+		case "nodeElement":
+			return el as extractRet<typeof type>;
+		default:
+			throw new Error(`unexpcted type argument ${type}`);
 	}
-}
+};
 
 //force strict type checking on filter in below switch
 function filterOutNull<T>(value: T | null | undefined): value is T {
@@ -124,4 +127,4 @@ function filterOutNull<T>(value: T | null | undefined): value is T {
 	return t ? true : true;
 }
 
-export { isURLalive, getDOM, extractAll, getSerializedDOM };
+export { isURLalive, getDOM, extract, extractAll, getSerializedDOM };
